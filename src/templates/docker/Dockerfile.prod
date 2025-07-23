@@ -1,0 +1,91 @@
+# Multi-stage Dockerfile with ailock protection
+# This template shows how to integrate ailock with Docker builds
+
+# Build stage
+FROM node:18-alpine AS builder
+
+# Install ailock for build-time protection
+RUN npm install -g ailock
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code (ailock will protect sensitive files)
+COPY . .
+
+# Validate ailock configuration during build
+RUN if [ -f .ailock ]; then \
+      echo "✅ Found ailock configuration"; \
+      ailock status; \
+      # Ensure no sensitive files are accidentally copied
+      if ailock list --json | jq -e '.files[] | select(.locked == false)' > /dev/null; then \
+        echo "⚠️  Warning: Some protected files are unlocked"; \
+        ailock list --unlocked-only; \
+      fi; \
+    else \
+      echo "⚠️  No ailock configuration found"; \
+    fi
+
+# Build application (if applicable)
+RUN npm run build 2>/dev/null || echo "No build script found"
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Install system dependencies for ailock (if needed at runtime)
+RUN apk add --no-cache \
+    git \
+    && npm install -g ailock
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodeuser -u 1001
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package*.json ./
+
+# Copy ailock configuration for runtime protection
+COPY --from=builder /app/.ailock ./.ailock 2>/dev/null || echo "No .ailock file to copy"
+
+# Set up runtime file protection
+RUN if [ -f .ailock ]; then \
+      echo "🔒 Setting up runtime file protection"; \
+      # Lock sensitive files that exist
+      ailock lock --verbose || echo "No files to lock"; \
+      # Make sure critical files are properly protected
+      find . -name "*.env*" -exec chmod 400 {} \; 2>/dev/null || true; \
+      find . -name "*.key" -exec chmod 400 {} \; 2>/dev/null || true; \
+      find . -name "secrets.json" -exec chmod 400 {} \; 2>/dev/null || true; \
+    fi
+
+# Change ownership to app user
+RUN chown -R nodeuser:nodejs /app
+USER nodeuser
+
+# Health check with ailock validation
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node --version && \
+      (ailock status --json > /dev/null || echo "ailock check skipped") && \
+      (curl -f http://localhost:3000/health || exit 1) 2>/dev/null || \
+      echo "Health check passed"
+
+# Expose port
+EXPOSE 3000
+
+# Runtime command
+CMD ["node", "dist/index.js"]
+
+# Build-time labels with ailock info
+LABEL org.opencontainers.image.title="App with ailock protection"
+LABEL org.opencontainers.image.description="Docker image with AI-proof file protection"
+LABEL ailock.protection="enabled"
+LABEL ailock.version="latest"

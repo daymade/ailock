@@ -1,0 +1,58 @@
+{
+  "name": "ailock",
+  "version": "1.0.0",
+  "description": "AI-Proof File Guard - Protect sensitive files from accidental AI modifications",
+  "main": "./dist/index.js",
+  "type": "module",
+  "bin": {
+    "ailock": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "file-protection",
+    "cli",
+    "security",
+    "lock",
+    "copilot",
+    "claude",
+    "cursor"
+  ],
+  "author": "AI-Proof Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "fast-glob": "^3.3.3",
+    "ink": "^6.0.1",
+    "ink-select-input": "^6.2.0",
+    "ink-spinner": "^5.0.0",
+    "ink-table": "^3.1.0",
+    "ink-text-input": "^6.0.0",
+    "inquirer": "^12.8.2",
+    "react": "^19.1.0",
+    "simple-git": "^3.28.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.1.0",
+    "@types/react": "^19.1.8",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

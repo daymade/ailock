@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        - NODE_ENV=production
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Environment variables should be managed securely
+      # Consider using Docker secrets or external secret management
+    volumes:
+      # Mount ailock configuration as read-only
+      - ./.ailock:/app/.ailock:ro
+      # Mount any required config files as read-only
+      - ./config:/app/config:ro
+      # Application logs (writable)
+      - ./logs:/app/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`your-domain.com`)"
+      - "ailock.protection=enabled"
+
+  # Optional: Redis for caching/sessions
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    
+  # Optional: PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      # These should be in a .env file protected by ailock
+      POSTGRES_DB: ${POSTGRES_DB:-myapp}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Mount initialization scripts as read-only
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+
+  # Optional: nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Nginx config should be protected
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - app-network
+    depends_on:
+      - app
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+
+# ailock integration notes:
+# 1. Protect sensitive files before building:
+#    - .env files (database credentials, API keys)
+#    - nginx configuration with SSL certificates
+#    - database initialization scripts
+#    - Any configuration files with secrets
+#
+# 2. Use ailock in your development workflow:
+#    ailock lock .env nginx/nginx.conf db/init/*.sql
+#
+# 3. In CI/CD pipeline:
+#    - Validate ailock configuration
+#    - Ensure sensitive files are properly protected
+#    - Generate protection reports
+#
+# 4. For production deployment:
+#    - Use Docker secrets or external secret management
+#    - Mount sensitive files as read-only volumes
+#    - Implement proper container security practices

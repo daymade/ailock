@@ -1,0 +1,142 @@
+name: AI-Proof File Guard Protection
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  ailock-protection:
+    runs-on: ubuntu-latest
+    name: Verify File Protection
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install ailock
+      run: npm install -g ailock
+      
+    - name: Validate ailock configuration
+      run: |
+        if [ ! -f .ailock ]; then
+          echo "❌ No .ailock configuration found"
+          echo "💡 Run 'ailock init' to create configuration"
+          exit 1
+        fi
+        echo "✅ .ailock configuration found"
+        
+    - name: Check protected files status
+      run: |
+        echo "📋 Checking protected files status..."
+        ailock status --json > ailock-status.json
+        
+        # Parse status and validate
+        LOCKED_COUNT=$(cat ailock-status.json | jq -r '.lockedFiles | length // 0')
+        PROTECTED_COUNT=$(cat ailock-status.json | jq -r '.protectedFiles | length // 0')
+        
+        echo "🔒 Locked files: $LOCKED_COUNT"
+        echo "📄 Protected files: $PROTECTED_COUNT"
+        
+        if [ "$PROTECTED_COUNT" -eq 0 ]; then
+          echo "⚠️  No protected files found - check your .ailock configuration"
+        fi
+        
+    - name: Verify no sensitive files in repository
+      run: |
+        echo "🔍 Scanning for common sensitive files..."
+        SENSITIVE_FILES=""
+        
+        # Check for common sensitive file patterns
+        for pattern in ".env" "*.key" "*.pem" "secrets.json" "credentials.json"; do
+          if find . -name "$pattern" -not -path "./node_modules/*" -not -path "./.git/*" | grep -q .; then
+            echo "⚠️  Found potentially sensitive files matching: $pattern"
+            find . -name "$pattern" -not -path "./node_modules/*" -not -path "./.git/*"
+            SENSITIVE_FILES="$SENSITIVE_FILES $pattern"
+          fi
+        done
+        
+        if [ -n "$SENSITIVE_FILES" ]; then
+          echo ""
+          echo "💡 Consider adding these patterns to your .ailock configuration:"
+          echo "   ailock init  # Re-run initialization wizard"
+          echo "   # Or manually edit .ailock file"
+        fi
+        
+    - name: Check for locked files in commit
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "🔍 Checking if PR modifies any locked files..."
+        
+        # Get list of changed files in PR
+        CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+        
+        if [ -z "$CHANGED_FILES" ]; then
+          echo "📝 No changed files detected"
+          exit 0
+        fi
+        
+        echo "📝 Changed files in PR:"
+        echo "$CHANGED_FILES"
+        
+        # Check if any changed files are protected and should be locked
+        echo "$CHANGED_FILES" | while read -r file; do
+          if [ -f "$file" ]; then
+            # Use ailock to check if this file should be protected
+            if ailock list --json | jq -e --arg file "$file" '.files[] | select(.path == $file)' > /dev/null; then
+              echo "🔒 Protected file in PR: $file"
+              
+              # Check if file is currently locked (in case CI runs on different environment)
+              if ! ailock pre-commit-check "$file" 2>/dev/null; then
+                echo "⚠️  File $file is protected but appears to be modified"
+                echo "💡 Ensure this file is unlocked before modification"
+              fi
+            fi
+          fi
+        done
+        
+    - name: Generate protection report
+      if: always()
+      run: |
+        echo "📊 Generating ailock protection report..."
+        
+        cat > ailock-report.md << 'EOF'
+        # 🔒 AI-Proof File Guard Report
+        
+        ## Configuration Status
+        - ✅ .ailock configuration present
+        - 🪝 Git hooks: $(ailock status --json | jq -r '.hasAilockHook // false')
+        - 📊 Total protected files: $(ailock status --json | jq -r '.protectedFiles | length // 0')
+        - 🔒 Currently locked files: $(ailock status --json | jq -r '.lockedFiles | length // 0')
+        
+        ## Protected Files
+        \`\`\`
+        $(ailock list)
+        \`\`\`
+        
+        ## Recommendations
+        - Ensure sensitive files are properly locked before deployment
+        - Review .ailock configuration regularly
+        - Install git hooks: \`ailock install-hooks\`
+        
+        Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        EOF
+        
+        echo "📋 Report generated: ailock-report.md"
+        
+    - name: Upload protection report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ailock-protection-report
+        path: |
+          ailock-report.md
+          ailock-status.json
+        retention-days: 30

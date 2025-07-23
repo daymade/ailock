@@ -1,0 +1,155 @@
+stages:
+  - validate
+  - test
+  - security
+
+variables:
+  NODE_VERSION: "18"
+
+# AI-Proof File Guard Protection Job
+ailock-protection:
+  stage: validate
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - apk add --no-cache git jq
+    - npm install -g ailock
+  script:
+    # Validate configuration
+    - |
+      if [ ! -f .ailock ]; then
+        echo "❌ No .ailock configuration found"
+        echo "💡 Run 'ailock init' to create configuration"
+        exit 1
+      fi
+      echo "✅ .ailock configuration found"
+    
+    # Check protection status
+    - echo "📋 Checking protected files status..."
+    - ailock status --json > ailock-status.json
+    - LOCKED_COUNT=$(cat ailock-status.json | jq -r '.lockedFiles | length // 0')
+    - PROTECTED_COUNT=$(cat ailock-status.json | jq -r '.protectedFiles | length // 0')
+    - echo "🔒 Locked files:$LOCKED_COUNT"
+    - echo "📄 Protected files:$PROTECTED_COUNT"
+    
+    # Generate detailed report
+    - |
+      cat > ailock-report.md << 'EOF'
+      # 🔒 AI-Proof File Guard CI Report
+      
+      ## Pipeline Information
+      - **Project**: $CI_PROJECT_NAME
+      - **Branch**: $CI_COMMIT_REF_NAME
+      - **Commit**: $CI_COMMIT_SHORT_SHA
+      - **Pipeline**: $CI_PIPELINE_ID
+      
+      ## Protection Status
+      EOF
+    - ailock status >> ailock-report.md
+    - echo "📊 Protection report generated"
+    
+    # Check for merge request changes
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        echo "🔍 Checking merge request for protected file changes..."
+        git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+        CHANGED_FILES=$(git diff --name-only origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD)
+        
+        if [ -n "$CHANGED_FILES" ]; then
+          echo "📝 Files changed in MR:"
+          echo "$CHANGED_FILES"
+          
+          # Check each changed file
+          echo "$CHANGED_FILES" | while read -r file; do
+            if [ -f "$file" ] && ailock list --json | jq -e --arg file "$file" '.files[] | select(.path == $file)' > /dev/null; then
+              echo "🔒 MR modifies protected file: $file"
+            fi
+          done
+        fi
+      fi
+  artifacts:
+    reports:
+      junit: ailock-status.json
+    paths:
+      - ailock-report.md
+      - ailock-status.json
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_MERGE_REQUEST_IID
+
+# Security scan for sensitive files
+sensitive-files-scan:
+  stage: security
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git findutils
+  script:
+    - echo "🔍 Scanning for potentially sensitive files in repository..."
+    - |
+      FOUND_SENSITIVE=false
+      
+      # Define sensitive file patterns
+      PATTERNS=".env .env.* *.key *.pem secrets.json credentials.json config.json"
+      
+      for pattern in $PATTERNS; do
+        FILES=$(find . -name "$pattern" -not -path "./node_modules/*" -not -path "./.git/*" -not -path "./dist/*" 2>/dev/null || true)
+        if [ -n "$FILES" ]; then
+          echo "⚠️  Found files matching pattern '$pattern':"
+          echo "$FILES"
+          FOUND_SENSITIVE=true
+        fi
+      done
+      
+      if [ "$FOUND_SENSITIVE" = "true" ]; then
+        echo ""
+        echo "💡 Recommendations:"
+        echo "   1. Add sensitive file patterns to .ailock configuration"
+        echo "   2. Lock sensitive files: ailock lock"
+        echo "   3. Install git hooks: ailock install-hooks"
+        echo "   4. Review .gitignore to prevent accidental commits"
+        
+        # Don't fail the pipeline, just warn
+        echo "⚠️  Sensitive files detected but not failing pipeline"
+      else
+        echo "✅ No obvious sensitive files found in repository"
+      fi
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_MERGE_REQUEST_IID
+
+# Optional: Integration test with ailock
+ailock-integration-test:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - apk add --no-cache git
+    - npm install -g ailock
+  script:
+    - echo "🧪 Running ailock integration tests..."
+    
+    # Test basic functionality
+    - ailock --version
+    - ailock status
+    
+    # Test configuration validation
+    - |
+      if [ -f .ailock ]; then
+        echo "✅ Testing .ailock configuration..."
+        ailock list --json > /dev/null
+        echo "✅ Configuration is valid"
+      else
+        echo "⚠️  No .ailock configuration to test"
+      fi
+    
+    # Test git integration if hooks are installed
+    - |
+      if [ -f .git/hooks/pre-commit ] && grep -q "ailock" .git/hooks/pre-commit; then
+        echo "✅ Git hooks are installed"
+      else
+        echo "⚠️  Git hooks not installed - run 'ailock install-hooks'"
+      fi
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_MERGE_REQUEST_IID

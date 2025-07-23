@@ -1,0 +1,87 @@
+{
+  "name": "Node.js Development with ailock Protection",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:18",
+  
+  // Features to install in the container
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  // Configure tool-specific properties
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "typescript.preferences.includePackageJsonAutoImports": "on",
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "files.associations": {
+          ".ailock": "gitignore"
+        }
+      },
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml"
+      ]
+    }
+  },
+
+  // Mount the local file system
+  "mounts": [
+    // Mount ailock configuration as read-only to protect it
+    "source=${localWorkspaceFolder}/.ailock,target=${containerWorkspaceFolder}/.ailock,type=bind,readonly",
+    
+    // Mount sensitive directories as read-only
+    "source=${localWorkspaceFolder}/config,target=${containerWorkspaceFolder}/config,type=bind,readonly",
+    "source=${localWorkspaceFolder}/secrets,target=${containerWorkspaceFolder}/secrets,type=bind,readonly",
+    
+    // Mount environment files as read-only (if they exist)
+    "source=${localWorkspaceFolder}/.env,target=${containerWorkspaceFolder}/.env,type=bind,readonly,consistency=cached",
+    "source=${localWorkspaceFolder}/.env.local,target=${containerWorkspaceFolder}/.env.local,type=bind,readonly,consistency=cached"
+  ],
+
+  // Command to run after container creation
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  // Commands to run when attaching to the container
+  "postAttachCommand": {
+    "ailock-status": "ailock status || echo 'ailock not configured yet'"
+  },
+
+  // Life cycle scripts
+  "initializeCommand": "echo 'Initializing development container with ailock protection...'",
+  "onCreateCommand": {
+    "install-ailock": "npm install -g ailock",
+    "setup-git": "git config --global --add safe.directory ${containerWorkspaceFolder}"
+  },
+
+  // Container user
+  "remoteUser": "node",
+  
+  // Container environment variables
+  "remoteEnv": {
+    "AILOCK_CONTAINER": "true",
+    "NODE_ENV": "development"
+  },
+
+  // Port forwarding
+  "forwardPorts": [3000, 5432, 6379],
+  "portsAttributes": {
+    "3000": {
+      "label": "Application",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    }
+  }
+}

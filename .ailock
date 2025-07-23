@@ -1,0 +1,18 @@
+# AI-Proof File Guard Configuration
+# Protect sensitive files from accidental AI modifications
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Configuration files
+config/*.json
+config/*.yaml
+
+# Security files
+**/*.key
+**/*.pem
+**/secrets.json
+
+# Add your own patterns below:
