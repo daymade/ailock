@@ -26,6 +26,14 @@
   ],
   "author": "AI-Proof Team",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daymade/ailock.git"
+  },
+  "homepage": "https://github.com/daymade/ailock#readme",
+  "bugs": {
+    "url": "https://github.com/daymade/ailock/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
