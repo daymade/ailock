@@ -16,24 +16,58 @@ AI-Proof File Guard (`ailock`) is a production-ready, cross-platform CLI tool th
 # Install globally via npm
 npm install -g ailock
 
-# Or run directly with npx
-npx ailock --help
+# Or run directly with npx (no installation needed)
+npx ailock lock .env
 ```
 
-### Basic Usage
+### **Entry-Level Usage - Get Started in 30 Seconds** 
+> ⚠️ **Note**: Core functionality is being stabilized - see [test status](CURRENT_STATUS_REPORT.md)
 
 ```bash
-# Lock files based on .ailock configuration
-ailock lock
+# Lock your .env file immediately (works without any setup)
+ailock lock .env
+✅ Locked: .env (protected from AI modifications)
 
-# Lock specific files
-ailock lock .env secrets.json
+# That's it! Your file is now safe from accidental AI changes
+# AI can still read it for context, but cannot modify it
+```
 
-# Unlock files for editing
-ailock unlock
+### **Progressive Enhancement**
 
-# Check what would be locked (dry run)
-ailock lock --dry-run --verbose
+```bash
+# Level 1: Lock specific files (no configuration needed)
+ailock lock .env secrets.json private.key
+
+# Level 2: Set up automatic pattern-based protection  
+ailock init                    # Creates .ailock with smart defaults
+ailock lock                    # Protects all matching files
+
+# Level 3: Add Git commit protection
+ailock install-hooks           # Blocks commits of locked files
+
+# Level 4: Check protection status anytime
+ailock status                  # See what's protected
+```
+
+### **Common Use Cases**
+
+```bash
+# Protect environment files during AI coding
+ailock lock .env .env.local
+
+# Protect API keys and secrets
+ailock lock config/api-keys.json secrets/
+
+# Protect production configurations  
+ailock lock docker-compose.prod.yml k8s/
+
+# Protect SSH keys and certificates
+ailock lock ~/.ssh/id_rsa *.pem
+
+# Unlock when you need to edit, then re-lock
+ailock unlock .env
+# ... make your changes ...
+ailock lock .env
 ```
 
 ## 🛡️ Why ailock?

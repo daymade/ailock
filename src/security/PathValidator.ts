@@ -61,16 +61,31 @@ export class SecurePathValidator {
     // SECURITY: Strict validation - reject any dangerous patterns immediately
     this.validatePathSecurity(inputPath);
 
-    // Parse and validate each path component
-    const pathParts = inputPath.split(path.sep).filter(part => part.length > 0);
+    // Handle absolute vs relative paths correctly
+    let resolvedPath: string;
     
-    for (const part of pathParts) {
-      this.validatePathComponent(part);
-    }
+    if (path.isAbsolute(inputPath)) {
+      // For absolute paths, validate components but preserve the absolute nature
+      const pathParts = inputPath.split(path.sep).filter(part => part.length > 0);
+      
+      for (const part of pathParts) {
+        this.validatePathComponent(part);
+      }
+      
+      // For absolute paths, use the input directly after validation
+      resolvedPath = path.resolve(inputPath);
+    } else {
+      // For relative paths, parse and resolve against base directory
+      const pathParts = inputPath.split(path.sep).filter(part => part.length > 0);
+      
+      for (const part of pathParts) {
+        this.validatePathComponent(part);
+      }
 
-    // Build clean path without any modification of components
-    const cleanPath = pathParts.join(path.sep);
-    const resolvedPath = path.resolve(baseDir, cleanPath);
+      // Build clean path without any modification of components
+      const cleanPath = pathParts.join(path.sep);
+      resolvedPath = path.resolve(baseDir, cleanPath);
+    }
 
     // Final security check - ensure path stays within bounds
     if (!isPathInside(resolvedPath, baseDir)) {
@@ -171,8 +186,9 @@ export class SecurePathValidator {
       throw new Error(`Empty or whitespace path component detected`);
     }
 
-    // Reject components with trailing/leading whitespace or dots
-    if (component !== component.trim() || component.endsWith('.') || component.startsWith('.')) {
+    // Reject components with trailing/leading whitespace or trailing dots
+    // Allow hidden files (starting with .) as they are common and legitimate
+    if (component !== component.trim() || component.endsWith('.')) {
       throw new Error(`Invalid path component format: ${component}`);
     }
   }
