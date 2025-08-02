@@ -119,53 +119,123 @@ class UnixAdapter implements PlatformAdapter {
   }
 
   async unlockFile(filePath: string): Promise<void> {
-    try {
-      // Validate and sanitize file path
-      const safePath = await this.pathValidator.validateAndSanitizePath(filePath);
-      await this.pathValidator.validatePathType(safePath, 'file');
-      
-      // Acquire atomic lock for the operation
-      const lockId = await this.atomicManager.acquireLock(safePath, {
-        timeout: 10000,
-        checkIntegrity: true
-      });
-
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Try to remove immutable bit on Linux first
-        if (platform() === 'linux') {
-          try {
-            await this.commandExecutor.executeCommand('chattr', ['-i', safePath], {
-              timeout: 5000
-            });
-          } catch (error) {
-            // Ignore chattr errors - may not be set or filesystem doesn't support
-            console.warn(`Warning: Could not remove immutable bit: ${error}`);
-          }
+        await this.attemptUnlockFile(filePath);
+        return; // Success - exit retry loop
+      } catch (error) {
+        if (attempt === maxRetries) {
+          // Final attempt failed - provide detailed diagnostics
+          await this.handleUnlockFailure(filePath, error);
+        } else {
+          console.warn(`Unlock attempt ${attempt}/${maxRetries} failed, retrying in ${retryDelay}ms: ${error}`);
+          await this.sleep(retryDelay);
         }
-        
-        // Remove chflags on macOS
-        if (platform() === 'darwin') {
-          try {
-            await this.commandExecutor.executeCommand('chflags', ['nouchg', safePath], {
-              timeout: 5000
-            });
-          } catch (error) {
-            console.warn(`Warning: Could not remove chflags: ${error}`);
-          }
-        }
-        
-        // Restore write permissions for owner using native chmod
-        await chmod(safePath, 0o644);
-      } finally {
-        await this.atomicManager.releaseLock(safePath, lockId);
       }
+    }
+  }
+
+  private async attemptUnlockFile(filePath: string): Promise<void> {
+    // Validate and sanitize file path
+    const safePath = await this.pathValidator.validateAndSanitizePath(filePath);
+    await this.pathValidator.validatePathType(safePath, 'file');
+    
+    // Acquire atomic lock for the operation
+    const lockId = await this.atomicManager.acquireLock(safePath, {
+      timeout: 10000,
+      checkIntegrity: true
+    });
+
+    try {
+      // Step 1: Remove platform-specific flags first (order matters!)
+      await this.removePlatformFlags(safePath);
+      
+      // Step 2: Brief delay to ensure flags are cleared
+      await this.sleep(100);
+      
+      // Step 3: Restore write permissions
+      await chmod(safePath, 0o644);
+      
+      // Step 4: Verify unlock was successful
+      await this.verifyUnlockSuccess(safePath);
+      
+    } finally {
+      await this.atomicManager.releaseLock(safePath, lockId);
+    }
+  }
+
+  private async removePlatformFlags(safePath: string): Promise<void> {
+    if (platform() === 'linux') {
+      try {
+        await this.commandExecutor.executeCommand('chattr', ['-i', safePath], {
+          timeout: 5000
+        });
+      } catch (error) {
+        // Ignore chattr errors - may not be set or filesystem doesn't support
+        console.warn(`Warning: Could not remove immutable bit: ${error}`);
+      }
+    } else if (platform() === 'darwin') {
+      try {
+        await this.commandExecutor.executeCommand('chflags', ['nouchg', safePath], {
+          timeout: 5000
+        });
+      } catch (error) {
+        console.warn(`Warning: Could not remove chflags: ${error}`);
+      }
+    }
+  }
+
+  private async verifyUnlockSuccess(safePath: string): Promise<void> {
+    try {
+      await access(safePath, constants.W_OK);
     } catch (error) {
-      this.errorHandler.handleAndThrow(error, { 
-        operation: 'unlockFile', 
-        filePath, 
-        platform: 'unix' 
+      throw new Error(`Unlock verification failed: File still not writable after unlock attempt: ${error}`);
+    }
+  }
+
+  private async handleUnlockFailure(filePath: string, originalError: unknown): Promise<never> {
+    try {
+      // Import diagnostics dynamically to avoid circular dependencies
+      const { FileDiagnostics } = await import('../utils/FileDiagnostics.js');
+      const diagnostics = new FileDiagnostics();
+      
+      const report = await diagnostics.diagnoseUnlockIssues(filePath);
+      const formattedReport = diagnostics.formatDiagnostics(report);
+      
+      // Log detailed diagnostics for debugging
+      console.error('\n' + formattedReport);
+      
+      // Create enhanced error with diagnostics
+      const enhancedError = new Error(
+        `Failed to unlock file ${filePath} after ${3} attempts. Original error: ${originalError}\n\n` +
+        `Quick diagnosis: ${report.diagnosis.join(', ')}\n` +
+        `Recommendations: ${report.recommendations.join(', ')}`
+      );
+      
+      this.errorHandler.handleAndThrow(enhancedError, {
+        operation: 'unlockFile',
+        filePath,
+        platform: 'unix',
+        attempts: 3,
+        diagnostics: report
+      });
+    } catch (diagnosticError) {
+      // If diagnostics fail, fall back to original error handling
+      console.error(`Diagnostic failed: ${diagnosticError}`);
+      this.errorHandler.handleAndThrow(originalError, {
+        operation: 'unlockFile',
+        filePath,
+        platform: 'unix',
+        attempts: 3
       });
     }
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async isLocked(filePath: string): Promise<boolean> {

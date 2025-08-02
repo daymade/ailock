@@ -11,6 +11,7 @@ import { preCommitCheckCommand } from './commands/pre-commit-check.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { generateCommand } from './commands/generate.js';
+import { diagnoseCommand } from './commands/diagnose.js';
 
 const program = new Command();
 
@@ -28,6 +29,7 @@ program.addCommand(statusInteractiveCommand);
 program.addCommand(listCommand);
 program.addCommand(generateCommand);
 program.addCommand(installHooksCommand);
+program.addCommand(diagnoseCommand);
 
 // Command for Git hook integration (internal use)
 program.addCommand(preCommitCheckCommand);
