@@ -1,11 +1,11 @@
 {
-  "name": "ailock",
+  "name": "@code-is-cheap/ailock",
   "version": "1.0.0",
   "description": "AI-Proof File Guard - Protect sensitive files from accidental AI modifications",
   "main": "./dist/index.js",
   "type": "module",
   "bin": {
-    "ailock": "./dist/index.js"
+    "ailock": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
