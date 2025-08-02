@@ -53,8 +53,8 @@ export const statusCommand = new Command('status')
         console.log(chalk.gray('   💡 Create .ailock file to define protection patterns'));
       }
       
-      // Detailed file listing
-      if (options.verbose && totalProtected > 0) {
+      // Always show file listing when there are protected files (not just in verbose mode)
+      if (totalProtected > 0) {
         console.log('\n' + chalk.blue.bold('📄 Protected Files:'));
         
         const currentDir = process.cwd();
@@ -64,9 +64,9 @@ export const statusCommand = new Command('status')
           const isLocked = status.lockedFiles.includes(file);
           
           if (isLocked) {
-            console.log(chalk.green(`   🔒 ${relativePath}`));
+            console.log(chalk.green(`   🔒 ${relativePath} (protected)`));
           } else {
-            console.log(chalk.yellow(`   🔓 ${relativePath}`));
+            console.log(chalk.yellow(`   🔓 ${relativePath} (needs locking)`));
           }
         }
       }
@@ -79,28 +79,50 @@ export const statusCommand = new Command('status')
         console.log(chalk.gray(`   Ailock managed: ${status.hookInfo.isAilockManaged ? 'Yes' : 'No'}`));
       }
       
-      // Recommendations
-      console.log('\n' + chalk.blue.bold('💡 Recommendations:'));
+      // Detailed status and recommendations
+      console.log('\n' + chalk.blue.bold('🔍 Protection Status:'));
       
       if (!status.isGitRepo) {
-        console.log(chalk.gray('   • Initialize Git repository for enhanced protection'));
-      } else if (!status.hasAilockHook) {
-        console.log(chalk.yellow('   • Install pre-commit hook: ailock install-hooks'));
-      }
-      
-      if (unlockedCount > 0) {
-        console.log(chalk.yellow('   • Lock unprotected files: ailock lock'));
+        console.log(chalk.red('   ❌ Git repository: Not detected'));
+        console.log(chalk.gray('      💡 Initialize Git for enhanced protection: git init'));
+      } else {
+        console.log(chalk.green('   ✅ Git repository: Active'));
+        
+        if (!status.hasAilockHook) {
+          console.log(chalk.red('   ❌ Pre-commit hook: Not installed'));
+          console.log(chalk.gray('      💡 Install protection hook: ailock install-hooks'));
+        } else {
+          console.log(chalk.green('   ✅ Pre-commit hook: Active'));
+        }
       }
       
       if (totalProtected === 0) {
-        console.log(chalk.gray('   • Create .ailock file to define protection patterns'));
+        console.log(chalk.yellow('   ⚠️  File protection: No files configured'));
+        console.log(chalk.gray('      💡 Create .ailock file to define protection patterns'));
+      } else if (unlockedCount > 0) {
+        console.log(chalk.yellow(`   ⚠️  File protection: ${unlockedCount} file(s) need locking`));
+        const currentDir = process.cwd();
+        const unlockedFiles = status.protectedFiles.filter(file => !status.lockedFiles.includes(file));
+        const fileList = unlockedFiles.map(file => path.relative(currentDir, file)).join(', ');
+        console.log(chalk.gray(`      📁 Files: ${fileList}`));
+        console.log(chalk.gray('      💡 Lock these files: ailock lock'));
+      } else {
+        console.log(chalk.green('   ✅ File protection: All files locked'));
       }
       
-      // Success/Warning exit codes
-      if (status.isGitRepo && status.hasAilockHook && unlockedCount === 0) {
-        console.log('\n' + chalk.green.bold('✅ All protection mechanisms are active'));
+      // Clear success/warning message
+      console.log('');
+      if (status.isGitRepo && status.hasAilockHook && unlockedCount === 0 && totalProtected > 0) {
+        console.log(chalk.green.bold('🎉 All protection mechanisms are active!'));
       } else {
-        console.log('\n' + chalk.yellow.bold('⚠️  Some protection mechanisms are not active'));
+        const issues = [];
+        if (!status.isGitRepo) issues.push('Git repository not detected');
+        if (status.isGitRepo && !status.hasAilockHook) issues.push('Pre-commit hook not installed');
+        if (unlockedCount > 0) issues.push(`${unlockedCount} file(s) need locking`);
+        if (totalProtected === 0) issues.push('No files configured for protection');
+        
+        console.log(chalk.yellow.bold('⚠️  Protection incomplete:'));
+        issues.forEach(issue => console.log(chalk.yellow(`   • ${issue}`)));
       }
       
     } catch (error) {
