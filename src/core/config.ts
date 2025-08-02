@@ -147,7 +147,7 @@ export async function loadConfig(startDir?: string, options?: LoadConfigOptions)
       patterns: [...new Set(allPatterns)], // Remove duplicates
       rootDir: workingDir,
       includeGitignored: options?.includeGitignored,
-      gitIgnorePatterns
+      gitIgnorePatterns: options?.includeGitignored ? gitIgnorePatterns : []
     };
   }
 
@@ -164,7 +164,7 @@ export async function loadConfig(startDir?: string, options?: LoadConfigOptions)
     patterns: [...new Set(allPatterns)], // Remove duplicates
     rootDir,
     includeGitignored: options?.includeGitignored,
-    gitIgnorePatterns
+    gitIgnorePatterns: options?.includeGitignored ? gitIgnorePatterns : []
   };
 }
 

@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-01-08
+
+### 🚀 Major Simplification Update - Ultimate User Experience
+
+#### 🎯 Revolutionary `ailock init` - One Command Setup
+- **Complete Project Setup**: `ailock init` now automatically detects project type, creates configuration, installs Git hooks, and protects files in one command
+- **Smart Project Detection**: Auto-detects Node.js (package.json), Docker (docker-compose.yml), Python (requirements.txt) projects
+- **Intelligent Configuration**: Generates project-specific .ailock files with appropriate patterns
+- **Seamless Integration**: Automatically installs Git pre-commit hooks and executes initial file protection
+- **Preserved Options**: `--interactive` for detailed wizard, `--config-only` for configuration-only mode
+
+#### 🎯 Default Safety First - .gitignore Integration
+- **Breaking Change**: `.gitignore` integration is now **enabled by default** in `lock` and `unlock` commands
+- **Safer Defaults**: Most sensitive files are now protected automatically without configuration
+- **New Option**: `--no-gitignore` flag to disable .gitignore integration when needed
+- **Backward Compatibility**: Old `--include-gitignored` flag still works but is now redundant
+
+#### 🎯 Intelligent Status Command
+- **Smart Output Detection**: Automatically shows detailed output in interactive terminals, simple output in CI/scripts
+- **New Options**: `--simple` to force simple output, improved `--verbose` for detailed information
+- **Environment Awareness**: Detects CI environments and non-interactive shells automatically
+- **Better UX**: More actionable status information with next-step suggestions
+
+#### 🔧 Enhanced Developer Experience
+- **Simplified Commands**: All commands now use safer defaults
+- **Better Help Text**: Updated descriptions emphasize the new simplified workflows
+- **Comprehensive Testing**: Added test suites for all new functionality
+- **Improved Documentation**: Updated README with new workflows and examples
+
+#### 🛠️ Technical Improvements
+- **Enhanced Error Handling**: Better error messages and recovery suggestions
+- **Improved Verbose Output**: Shows clear information about what patterns are being used from which sources
+- **Code Organization**: Refactored command structure for better maintainability
+
+### 🧠 Design Philosophy Evolution
+This release embodies the principle: **"The safest behavior should be the simplest to use"**. New users can now get complete project protection with a single `ailock init` command, while advanced users retain full control with explicit options.
+
 ## [1.1.0] - 2025-01-08
 
 ### 🆕 Added - Smart .gitignore Integration

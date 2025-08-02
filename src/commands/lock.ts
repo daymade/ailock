@@ -8,7 +8,7 @@ export const lockCommand = new Command('lock')
   .argument('[patterns...]', 'Specific file patterns to lock (if not provided, uses .ailock config)')
   .option('-v, --verbose', 'Show verbose output')
   .option('-d, --dry-run', 'Show what would be locked without actually locking')
-  .option('--include-gitignored', 'Include sensitive files from .gitignore')
+  .option('--no-gitignore', 'Exclude sensitive files from .gitignore (gitignore integration is enabled by default)')
   .action(async (patterns: string[], options) => {
     try {
       const adapter = getPlatformAdapter();
@@ -25,16 +25,19 @@ export const lockCommand = new Command('lock')
         });
       } else {
         // Use .ailock configuration
+        // Default: include gitignore unless explicitly disabled with --no-gitignore
         const configOptions: LoadConfigOptions = {
-          includeGitignored: options.includeGitignored
+          includeGitignored: options.gitignore !== false
         };
         const config = await loadConfig(undefined, configOptions);
         filesToLock = await findProtectedFiles(config);
         
         if (options.verbose) {
           console.log(chalk.blue('Using patterns from .ailock:'), config.patterns.join(', '));
-          if (config.includeGitignored && config.gitIgnorePatterns && config.gitIgnorePatterns.length > 0) {
+          if (configOptions.includeGitignored && config.gitIgnorePatterns && config.gitIgnorePatterns.length > 0) {
             console.log(chalk.blue('Sensitive patterns from .gitignore:'), config.gitIgnorePatterns.join(', '));
+          } else if (!configOptions.includeGitignored) {
+            console.log(chalk.gray('Gitignore integration: disabled (--no-gitignore)'));
           }
         }
       }

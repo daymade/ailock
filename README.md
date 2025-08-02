@@ -20,33 +20,31 @@ npm install -g ailock
 npx ailock lock .env
 ```
 
-### **Entry-Level Usage - Get Started in 30 Seconds** 
-> ⚠️ **Note**: Core functionality is being stabilized - see [test status](CURRENT_STATUS_REPORT.md)
+### **🚀 Zero-Config Setup - Get Started in 10 Seconds** 
 
 ```bash
-# Lock your .env file immediately (works without any setup)
-ailock lock .env
-✅ Locked: .env (protected from AI modifications)
+# One command to protect your entire project
+ailock init
+✅ Complete setup! Detected Node.js project, created config, installed hooks, protected 3 files
 
-# That's it! Your file is now safe from accidental AI changes
-# AI can still read it for context, but cannot modify it
+# That's it! Your project is now AI-proof
+# AI can still read sensitive files for context, but cannot modify them
 ```
 
 ### **Progressive Enhancement**
 
 ```bash
-# Level 1: Lock specific files (no configuration needed)
-ailock lock .env secrets.json private.key
+# Level 1: Complete project setup (recommended)
+ailock init                    # 🆕 Smart setup: config + hooks + protection
 
-# Level 2: Set up automatic pattern-based protection  
-ailock init                    # Creates .ailock with smart defaults
-ailock lock                    # Protects all matching files
+# Level 2: Manual file protection
+ailock lock .env secrets.json  # Lock specific files
+ailock lock                    # Lock all configured files (includes .gitignore)
 
-# Level 3: Add Git commit protection
-ailock install-hooks           # Blocks commits of locked files
-
-# Level 4: Check protection status anytime
-ailock status                  # See what's protected
+# Level 3: Advanced usage
+ailock lock --no-gitignore     # Exclude .gitignore integration
+ailock status                  # Smart status (detailed in terminal, simple in CI)
+ailock unlock .env             # Unlock for editing
 ```
 
 ### **Common Use Cases**
@@ -69,12 +67,12 @@ ailock unlock .env
 # ... make your changes ...
 ailock lock .env
 
-# 🆕 Smart .gitignore Integration
-# Automatically protect sensitive files from .gitignore
-ailock lock --include-gitignored
+# 🆕 One-Command Project Setup
+ailock init                    # Complete security setup for your project
 
-# Perfect for zero-config protection
-ailock lock --include-gitignored --verbose
+# 🆕 Smart .gitignore Integration (now default!)
+ailock lock                    # Automatically includes .gitignore sensitive files
+ailock lock --verbose          # See exactly what's being protected
 ```
 
 ## 🛡️ Why ailock?
@@ -161,44 +159,50 @@ If no `.ailock` file exists, these patterns are protected by default:
 ### Core Commands
 
 #### `ailock init`
-Initialize ailock configuration with interactive wizard.
+🚀 Complete project security setup - one command to protect everything.
 ```bash
-ailock init                 # Interactive setup wizard
-ailock init --skip-wizard   # Create basic .ailock file
-ailock init --force        # Overwrite existing configuration
+ailock init                 # 🆕 Smart setup: detect project + config + hooks + protection
+ailock init --interactive   # Use detailed wizard for custom setup
+ailock init --config-only   # Only create .ailock configuration file
+ailock init --force        # Overwrite existing configuration and hooks
 ```
+
+**🆕 v1.2**: The new `ailock init` automatically detects your project type (Node.js, Docker, Python), creates appropriate configuration, installs Git hooks, and protects sensitive files - all in one command!
 
 #### `ailock lock`
 Lock files to prevent modifications.
 ```bash
-ailock lock                       # Lock files from .ailock configuration
+ailock lock                       # 🆕 Lock files (includes .gitignore by default)
 ailock lock .env secrets/*        # Lock specific files/patterns
 ailock lock --verbose             # Show detailed output
 ailock lock --dry-run            # Preview changes without applying
-ailock lock --include-gitignored # 🆕 Include sensitive files from .gitignore
+ailock lock --no-gitignore       # 🆕 Exclude .gitignore sensitive files
 ```
 
-**🆕 New in v1.1**: The `--include-gitignored` option automatically discovers and protects sensitive files from your `.gitignore`, providing zero-config protection for files that can't be recovered from version control.
+**🆕 v1.2 Simplification**: `.gitignore` integration is now **enabled by default** for the safest protection. Use `--no-gitignore` to disable if needed.
 
 #### `ailock unlock`
 Unlock files to allow modifications.
 ```bash
-ailock unlock                     # Unlock files from configuration
+ailock unlock                     # 🆕 Unlock files (includes .gitignore by default)
 ailock unlock .env               # Unlock specific files
 ailock unlock --verbose          # Show detailed output
 ailock unlock --dry-run         # Preview changes without applying
-ailock unlock --include-gitignored # 🆕 Include sensitive files from .gitignore
+ailock unlock --no-gitignore     # 🆕 Exclude .gitignore sensitive files
 ```
 
 ### Status & Monitoring
 
 #### `ailock status`
-Show current protection status.
+Show current protection status with smart output detection.
 ```bash
-ailock status              # Basic status overview
-ailock status --verbose    # Detailed information
-ailock status --json       # JSON output for scripts
+ailock status              # 🆕 Smart output (detailed in terminal, simple in CI)
+ailock status --verbose    # Force detailed information
+ailock status --simple     # 🆕 Force simple output for scripts
+ailock status --json       # JSON output for automation
 ```
+
+**🆕 v1.2 Intelligence**: Automatically detects if you're in an interactive terminal and shows appropriate detail level.
 
 #### `ailock status-interactive` (alias: `dash`)
 Launch interactive real-time status dashboard.
@@ -374,11 +378,18 @@ ailock/
 - **Docker**: Production-ready containerization with file protection
 - **Dev Containers**: Isolated development environments with security
 
-## 🏆 Project Status - v1.1.0 COMPLETE
+## 🏆 Project Status - v1.2.0 COMPLETE
 
 All planned features have been successfully implemented and tested:
 
-### 🆕 v1.1.0: Smart .gitignore Integration (NEW!)
+### 🚀 v1.2.0: Ultimate Simplification (NEW!)
+- **One-command setup**: `ailock init` does everything automatically
+- **Smart project detection**: Auto-detects Node.js, Docker, Python projects
+- **Default safety**: `.gitignore` integration now enabled by default
+- **Intelligent UX**: Status command adapts to terminal environment
+- **Zero learning curve**: New users protected in 10 seconds
+
+### ✅ v1.1.0: Smart .gitignore Integration
 - Automatic discovery of sensitive files from `.gitignore`
 - Intelligent pattern filtering (only truly sensitive files)
 - Zero-config protection for unversioned critical files
@@ -409,7 +420,7 @@ All planned features have been successfully implemented and tested:
 - Team workflow standardization tools
 
 ## 🚀 Production Ready
-ailock v1.1.0 is now production-ready with enhanced .gitignore integration, enterprise-grade features, comprehensive testing, and battle-tested security mechanisms.
+ailock v1.2.0 is now production-ready with **ultimate simplification**, one-command setup, smart project detection, enhanced .gitignore integration, enterprise-grade features, comprehensive testing, and battle-tested security mechanisms.
 
 ## 🤝 Contributing
 
