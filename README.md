@@ -68,6 +68,13 @@ ailock lock ~/.ssh/id_rsa *.pem
 ailock unlock .env
 # ... make your changes ...
 ailock lock .env
+
+# 🆕 Smart .gitignore Integration
+# Automatically protect sensitive files from .gitignore
+ailock lock --include-gitignored
+
+# Perfect for zero-config protection
+ailock lock --include-gitignored --verbose
 ```
 
 ## 🛡️ Why ailock?
@@ -79,6 +86,23 @@ AI coding assistants (GitHub Copilot, Claude Code, Cursor Agent) with "apply cha
 - 🔥 **Broken deployments** from modified config files  
 - 💥 **Service outages** from altered infrastructure scripts
 - 🚨 **Security vulnerabilities** from changed access controls
+
+**But here's the critical insight**: The most dangerous files are often **not in version control** (listed in `.gitignore`). Once these files are corrupted by AI tools, **you can't restore them from git** - they're simply lost forever.
+
+### 💡 Developer-Friendly Design Philosophy
+
+ailock v1.1 introduces **smart .gitignore integration** based on a simple but powerful observation:
+
+> **Files in `.gitignore` are intentionally excluded from version control, making them unrecoverable if accidentally modified.**
+
+Our design philosophy prioritizes **developer experience** without sacrificing security:
+
+1. **Zero Configuration**: `ailock lock --include-gitignored` works immediately without setup
+2. **Smart Filtering**: Only protects *actually sensitive* files from `.gitignore` (`.env`, `*.key`, etc.)
+3. **Predictable Behavior**: Clear verbose output shows exactly what's being protected and why
+4. **Non-Intrusive**: Existing workflows remain unchanged, new protection is opt-in
+
+This approach respects the intelligence of `.gitignore` as a security boundary while providing the safety net that AI-assisted development demands.
 
 ### The Solution
 ailock provides **multi-layer protection**:
@@ -147,19 +171,23 @@ ailock init --force        # Overwrite existing configuration
 #### `ailock lock`
 Lock files to prevent modifications.
 ```bash
-ailock lock                 # Lock files from .ailock configuration
-ailock lock .env secrets/*  # Lock specific files/patterns
-ailock lock --verbose       # Show detailed output
-ailock lock --dry-run      # Preview changes without applying
+ailock lock                       # Lock files from .ailock configuration
+ailock lock .env secrets/*        # Lock specific files/patterns
+ailock lock --verbose             # Show detailed output
+ailock lock --dry-run            # Preview changes without applying
+ailock lock --include-gitignored # 🆕 Include sensitive files from .gitignore
 ```
+
+**🆕 New in v1.1**: The `--include-gitignored` option automatically discovers and protects sensitive files from your `.gitignore`, providing zero-config protection for files that can't be recovered from version control.
 
 #### `ailock unlock`
 Unlock files to allow modifications.
 ```bash
-ailock unlock              # Unlock files from configuration
-ailock unlock .env         # Unlock specific files
-ailock unlock --verbose    # Show detailed output
-ailock unlock --dry-run    # Preview changes without applying
+ailock unlock                     # Unlock files from configuration
+ailock unlock .env               # Unlock specific files
+ailock unlock --verbose          # Show detailed output
+ailock unlock --dry-run         # Preview changes without applying
+ailock unlock --include-gitignored # 🆕 Include sensitive files from .gitignore
 ```
 
 ### Status & Monitoring
@@ -346,9 +374,15 @@ ailock/
 - **Docker**: Production-ready containerization with file protection
 - **Dev Containers**: Isolated development environments with security
 
-## 🏆 Project Status - v1.0.0 COMPLETE
+## 🏆 Project Status - v1.1.0 COMPLETE
 
 All planned features have been successfully implemented and tested:
+
+### 🆕 v1.1.0: Smart .gitignore Integration (NEW!)
+- Automatic discovery of sensitive files from `.gitignore`
+- Intelligent pattern filtering (only truly sensitive files)
+- Zero-config protection for unversioned critical files
+- Enhanced developer experience with detailed verbose output
 
 ### ✅ Phase 1: Core CLI (Complete)
 - Cross-platform file locking (chmod, chattr, icacls)
@@ -375,7 +409,7 @@ All planned features have been successfully implemented and tested:
 - Team workflow standardization tools
 
 ## 🚀 Production Ready
-ailock v1.0.0 is now production-ready with enterprise-grade features, comprehensive testing, and battle-tested security mechanisms.
+ailock v1.1.0 is now production-ready with enhanced .gitignore integration, enterprise-grade features, comprehensive testing, and battle-tested security mechanisms.
 
 ## 🤝 Contributing
 

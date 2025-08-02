@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadConfig, findProtectedFiles } from '../core/config.js';
+import { loadConfig, findProtectedFiles, LoadConfigOptions } from '../core/config.js';
 import { getPlatformAdapter } from '../core/platform.js';
 
 export const lockCommand = new Command('lock')
@@ -8,6 +8,7 @@ export const lockCommand = new Command('lock')
   .argument('[patterns...]', 'Specific file patterns to lock (if not provided, uses .ailock config)')
   .option('-v, --verbose', 'Show verbose output')
   .option('-d, --dry-run', 'Show what would be locked without actually locking')
+  .option('--include-gitignored', 'Include sensitive files from .gitignore')
   .action(async (patterns: string[], options) => {
     try {
       const adapter = getPlatformAdapter();
@@ -24,11 +25,17 @@ export const lockCommand = new Command('lock')
         });
       } else {
         // Use .ailock configuration
-        const config = await loadConfig();
+        const configOptions: LoadConfigOptions = {
+          includeGitignored: options.includeGitignored
+        };
+        const config = await loadConfig(undefined, configOptions);
         filesToLock = await findProtectedFiles(config);
         
         if (options.verbose) {
           console.log(chalk.blue('Using patterns from .ailock:'), config.patterns.join(', '));
+          if (config.includeGitignored && config.gitIgnorePatterns && config.gitIgnorePatterns.length > 0) {
+            console.log(chalk.blue('Sensitive patterns from .gitignore:'), config.gitIgnorePatterns.join(', '));
+          }
         }
       }
 

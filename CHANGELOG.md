@@ -7,15 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned for Phase 2
-- Git pre-commit hook integration
-- Husky framework support
-- Commit-time protection against locked file changes
+## [1.1.0] - 2025-01-08
 
-### Planned for Phase 3
-- Interactive terminal UI with Ink
-- Workspace initialization wizard
-- Enhanced status reporting and file management
+### 🆕 Added - Smart .gitignore Integration
+- **Developer-Friendly Design**: Automatic discovery and protection of sensitive files from `.gitignore`
+- **Smart Filtering**: Intelligent pattern recognition that only protects truly sensitive files (`.env`, `*.key`, `*secret*`, etc.) while ignoring development artifacts (`node_modules/`, `.vscode/`, etc.)
+- **Zero Configuration**: Works immediately with `--include-gitignored` flag without requiring additional setup
+- **Enhanced CLI Options**:
+  - `ailock lock --include-gitignored` - Include sensitive files from .gitignore
+  - `ailock unlock --include-gitignored` - Include sensitive files from .gitignore when unlocking
+  - Verbose output shows both `.ailock` and `.gitignore` patterns for transparency
+
+### 🧠 Design Philosophy
+This release embodies our core principle: **Files in `.gitignore` are intentionally excluded from version control, making them unrecoverable if accidentally modified by AI tools**. The integration provides a safety net for the most vulnerable files in your project.
+
+### 🔧 Technical Improvements
+- Enhanced `AilockConfig` interface with `includeGitignored` and `gitIgnorePatterns` options
+- New `parseGitignoreContent()` function with intelligent sensitivity detection
+- Improved `loadConfig()` function supporting configuration merging and deduplication
+- Git repository integration using existing `simple-git` dependency
 
 ## [0.1.0] - 2024-01-XX
 
