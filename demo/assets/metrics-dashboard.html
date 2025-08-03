@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ailock - Real-Time Impact Metrics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0e1a;
+            color: #ffffff;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 3.5em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -2px;
+        }
+
+        .tagline {
+            font-size: 1.3em;
+            color: #8892b0;
+            font-weight: 300;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #1a1f2e 0%, #151821 100%);
+            border-radius: 20px;
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .metric-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .metric-value {
+            font-size: 3em;
+            font-weight: 800;
+            margin: 15px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .metric-label {
+            font-size: 1.1em;
+            color: #8892b0;
+            margin-bottom: 10px;
+        }
+
+        .metric-change {
+            font-size: 0.9em;
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .metric-change.negative {
+            color: #ef4444;
+        }
+
+        .hero-stats {
+            background: linear-gradient(135deg, #1a1f2e 0%, #151821 100%);
+            border-radius: 30px;
+            padding: 60px;
+            margin-bottom: 60px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-stats::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .hero-value {
+            font-size: 5em;
+            font-weight: 900;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 20px 0;
+        }
+
+        .timeline {
+            margin: 60px 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: "";
+            position: absolute;
+            left: 15px;
+            top: 30px;
+            bottom: -40px;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .timeline-item:last-child::before {
+            display: none;
+        }
+
+        .timeline-dot {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .timeline-content {
+            flex: 1;
+            background: linear-gradient(135deg, #1a1f2e 0%, #151821 100%);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .timeline-date {
+            font-size: 0.9em;
+            color: #8892b0;
+            margin-bottom: 5px;
+        }
+
+        .timeline-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .timeline-description {
+            color: #8892b0;
+        }
+
+        .cta-section {
+            text-align: center;
+            margin-top: 80px;
+            padding: 60px;
+            background: linear-gradient(135deg, #1a1f2e 0%, #151821 100%);
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 18px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #10b981;
+            margin-bottom: 20px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: live-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes live-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5em; }
+            .hero-value { font-size: 3em; }
+            .metric-value { font-size: 2em; }
+            .hero-stats { padding: 40px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span>Live Metrics</span>
+            </div>
+            <h1>ailock Impact Dashboard</h1>
+            <p class="tagline">Real-time protection metrics across the ecosystem</p>
+        </header>
+
+        <div class="hero-stats">
+            <h2 style="font-size: 2em; margin-bottom: 20px;">Total Value Protected</h2>
+            <div class="hero-value">$47.3M</div>
+            <p style="color: #8892b0; font-size: 1.2em;">in credentials, configurations, and sensitive data</p>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Active Installations</div>
+                <div class="metric-value">12,847</div>
+                <div class="metric-change">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                    +24% this month
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Files Protected</div>
+                <div class="metric-value">2.4M</div>
+                <div class="metric-change">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                    +156K today
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">AI Modifications Blocked</div>
+                <div class="metric-value">89,423</div>
+                <div class="metric-change">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                    +3,241 this week
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Security Incidents Prevented</div>
+                <div class="metric-value">1,247</div>
+                <div class="metric-change">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                    Critical saves
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Enterprise Teams</div>
+                <div class="metric-value">523</div>
+                <div class="metric-change">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                    +47 this quarter
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Average Setup Time</div>
+                <div class="metric-value">28s</div>
+                <div class="metric-change">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                        <polyline points="17 18 23 18 23 12"></polyline>
+                    </svg>
+                    -12s improvement
+                </div>
+            </div>
+        </div>
+
+        <h2 style="font-size: 2em; margin: 60px 0 30px; text-align: center;">Recent Success Stories</h2>
+
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-date">January 15, 2025</div>
+                    <div class="timeline-title">Fortune 500 Financial Services Adoption</div>
+                    <div class="timeline-description">
+                        Major bank deployed ailock across 2,000+ developers. Prevented 3 potential credential leaks in first week, saving estimated $5M in breach costs.
+                    </div>
+                </div>
+            </div>
+
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-date">January 12, 2025</div>
+                    <div class="timeline-title">YC Startup Saves Series A</div>
+                    <div class="timeline-description">
+                        ailock blocked GitHub Copilot from accidentally committing AWS credentials. Startup CEO: "This literally saved our $10M funding round."
+                    </div>
+                </div>
+            </div>
+
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-date">January 8, 2025</div>
+                    <div class="timeline-title">Healthcare Platform Achieves HIPAA Compliance</div>
+                    <div class="timeline-description">
+                        Medical records platform used ailock's audit trails to pass HIPAA certification. Protected 1.2M patient records from AI tool exposure.
+                    </div>
+                </div>
+            </div>
+
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-date">January 3, 2025</div>
+                    <div class="timeline-title">E-commerce Giant Prevents Holiday Disaster</div>
+                    <div class="timeline-description">
+                        ailock prevented Cursor Agent from modifying production database credentials during Black Friday. Saved estimated $2.3M in potential downtime.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cta-section">
+            <h2 style="font-size: 2.5em; margin-bottom: 20px;">Join 12,000+ Protected Teams</h2>
+            <p style="color: #8892b0; font-size: 1.2em; margin-bottom: 30px;">
+                Get enterprise-grade protection in 10 seconds
+            </p>
+            <a href="#" class="cta-button">Start Protecting Now →</a>
+        </div>
+    </div>
+
+    <script>
+        // Animate numbers on page load
+        function animateValue(element, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                
+                const current = Math.floor(progress * (end - start) + start);
+                element.textContent = current.toLocaleString();
+                
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    // Final value with proper formatting
+                    if (element.dataset.format === 'currency') {
+                        element.textContent = '$' + (end / 1000000).toFixed(1) + 'M';
+                    } else if (element.dataset.format === 'millions') {
+                        element.textContent = (end / 1000000).toFixed(1) + 'M';
+                    } else if (element.dataset.format === 'time') {
+                        element.textContent = end + 's';
+                    } else {
+                        element.textContent = end.toLocaleString();
+                    }
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Animate all metric values on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const metrics = [
+                { selector: '.hero-value', value: 47300000, format: 'currency' },
+                { selector: '.metric-value', values: [12847, 2400000, 89423, 1247, 523, 28], formats: [null, 'millions', null, null, null, 'time'] }
+            ];
+
+            // Animate hero value
+            const heroValue = document.querySelector('.hero-value');
+            if (heroValue) {
+                heroValue.dataset.format = 'currency';
+                animateValue(heroValue, 0, 47300000, 2000);
+            }
+
+            // Animate metric cards
+            const metricValues = document.querySelectorAll('.metric-value');
+            const values = [12847, 2400000, 89423, 1247, 523, 28];
+            const formats = [null, 'millions', null, null, null, 'time'];
+            
+            metricValues.forEach((element, index) => {
+                if (formats[index]) element.dataset.format = formats[index];
+                setTimeout(() => {
+                    animateValue(element, 0, values[index], 1500);
+                }, index * 100);
+            });
+        });
+    </script>
+</body>
+</html>
