@@ -111,6 +111,15 @@ _ailock() {
                         '1:shell:(bash zsh fish powershell)' \\
                         '--install-instructions[Show installation instructions]'
                     ;;
+                
+                setup-completion|help)
+                    # No additional arguments for these commands
+                    ;;
+                    
+                *)
+                    # Default case - provide file completion
+                    _files
+                    ;;
             esac
             ;;
     esac
