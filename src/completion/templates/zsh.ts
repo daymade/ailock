@@ -146,9 +146,16 @@ _ailock_unlocked_files() {
     fi
 }
 
+# Ensure completion system is initialized
+if ! command -v compdef &>/dev/null; then
+    autoload -Uz compinit && compinit
+fi
+
 # Set up completion for both ailock and aiunlock
-compdef _ailock ailock
-compdef _ailock aiunlock
+if command -v compdef &>/dev/null; then
+    compdef _ailock ailock
+    compdef _ailock aiunlock
+fi
 
 # Lazy loading support (optional)
 # To enable lazy loading, wrap the function:
@@ -157,7 +164,9 @@ compdef _ailock aiunlock
 #     source <(ailock completion zsh)
 #     _ailock "\$@"
 # }
-# compdef _ailock_lazy ailock
-# compdef _ailock_lazy aiunlock
+# if command -v compdef &>/dev/null; then
+#     compdef _ailock_lazy ailock
+#     compdef _ailock_lazy aiunlock
+# fi
 `;
 }
