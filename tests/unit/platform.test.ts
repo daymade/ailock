@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, writeFile, rm, chmod } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { detectPlatform, getPlatformAdapter, Platform } from '../../src/core/platform.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const TEST_TEMP_DIR = resolve(__dirname, '../../.test-temp');
 
 describe('Platform Detection and Adapters', () => {
   describe('detectPlatform', () => {
@@ -17,7 +22,9 @@ describe('Platform Detection and Adapters', () => {
     let testFile: string;
     
     beforeEach(async () => {
-      tempDir = join(tmpdir(), `ailock-test-${Date.now()}`);
+      // Create test directory within project
+      await mkdir(TEST_TEMP_DIR, { recursive: true });
+      tempDir = join(TEST_TEMP_DIR, `test-${Date.now()}`);
       await mkdir(tempDir, { recursive: true });
       testFile = join(tempDir, 'test.txt');
       await writeFile(testFile, 'test content');
@@ -25,10 +32,23 @@ describe('Platform Detection and Adapters', () => {
 
     afterEach(async () => {
       try {
-        // Ensure file is unlocked before cleanup
-        await chmod(testFile, 0o644);
+        // Try to unlock using the adapter first
+        const adapter = getPlatformAdapter();
+        await adapter.unlockFile(testFile);
       } catch {
-        // Ignore errors during cleanup
+        // If adapter fails, try manual cleanup
+        try {
+          await chmod(testFile, 0o644);
+          // Remove immutable flag on macOS
+          if (process.platform === 'darwin') {
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            await execAsync(`chflags nouchg "${testFile}"`).catch(() => {});
+          }
+        } catch {
+          // Ignore errors during cleanup
+        }
       }
       await rm(tempDir, { recursive: true, force: true });
     });
@@ -87,11 +107,30 @@ describe('Platform Detection and Adapters', () => {
   describe('Error Handling', () => {
     it('should handle non-existent files gracefully', async () => {
       const adapter = getPlatformAdapter();
-      const nonExistentFile = join(tmpdir(), 'non-existent-file.txt');
+      const nonExistentFile = join(TEST_TEMP_DIR, 'non-existent-file.txt');
       
       // Should throw error for non-existent file
       await expect(adapter.lockFile(nonExistentFile)).rejects.toThrow();
       await expect(adapter.unlockFile(nonExistentFile)).rejects.toThrow();
+    });
+
+    it('should return false for isLocked on non-existent files', async () => {
+      const adapter = getPlatformAdapter();
+      const nonExistentFile = join(TEST_TEMP_DIR, 'definitely-does-not-exist-' + Date.now() + '.txt');
+      
+      // Non-existent file should not be considered locked
+      const isLocked = await adapter.isLocked(nonExistentFile);
+      expect(isLocked).toBe(false);
+    });
+
+    it('should correctly handle the reported bug scenario', async () => {
+      const adapter = getPlatformAdapter();
+      // This is the exact path from the bug report
+      const buggedPath = '/home/tsong/workspace/java/mymercury-branches/oeg-mymercurysvc/oeg-mymercurysvc-application/src/main/resources/application-local.yml';
+      
+      // Non-existent file should not be considered locked
+      const isLocked = await adapter.isLocked(buggedPath);
+      expect(isLocked).toBe(false);
     });
   });
 });

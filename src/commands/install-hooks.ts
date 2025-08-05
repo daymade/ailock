@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { access, constants } from 'fs/promises';
 import { isGitRepository, getRepoRoot, installPreCommitHook, getHookInfo } from '../core/git.js';
 
 export const installHooksCommand = new Command('install-hooks')
@@ -88,8 +89,11 @@ export const installHooksCommand = new Command('install-hooks')
       // Install the hook
       await installPreCommitHook(repoRoot, options.force);
       
+      // Get fresh hook info after installation
+      const freshHookInfo = getHookInfo(repoRoot);
+      
       console.log(chalk.green('✅ Pre-commit hook installed successfully!'));
-      console.log(chalk.gray(`   Hook location: ${hookInfo.hookPath}`));
+      console.log(chalk.gray(`   Hook location: ${freshHookInfo.hookPath}`));
       
       // Show what the hook does
       console.log('\n' + chalk.blue.bold('🛡️  Protection Features:'));
@@ -107,12 +111,15 @@ export const installHooksCommand = new Command('install-hooks')
       console.log('\n' + chalk.blue('🧪 Testing hook installation...'));
       
       try {
-        const { execSync } = require('child_process');
-        execSync(`test -x "${hookInfo.hookPath}"`, { stdio: 'ignore' });
+        // Check if hook is executable using fs.access
+        await access(freshHookInfo.hookPath, constants.X_OK);
         console.log(chalk.green('✅ Hook is executable and ready'));
-      } catch {
+      } catch (error) {
         console.log(chalk.yellow('⚠️  Hook may not be executable'));
-        console.log(chalk.gray(`   Run: chmod +x "${hookInfo.hookPath}"`));
+        console.log(chalk.gray(`   Run: chmod +x "${freshHookInfo.hookPath}"`));
+        if (error instanceof Error) {
+          console.log(chalk.gray(`   Error: ${error.message}`));
+        }
       }
       
     } catch (error) {

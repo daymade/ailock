@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-08-05
+
+### 🎯 Smart Command Routing & Enhanced User Experience
+
+#### New Features
+
+##### 🔓 `aiunlock` Command
+- **New binary**: Added `aiunlock` as a companion command to `ailock`
+- **Purpose**: Provides intuitive unlock operations matching the lock/unlock paradigm
+- **Usage**: `aiunlock file.txt` directly unlocks files without subcommands
+
+##### 🚀 Smart Command Routing
+- **No arguments behavior**: `ailock` or `aiunlock` with no arguments shows status
+- **Direct file operations**: 
+  - `ailock file.txt` → automatically locks the file (no need for `lock` subcommand)
+  - `aiunlock file.txt` → automatically unlocks the file
+  - Works with directories, glob patterns, and paths
+- **Unknown command handling**: 
+  - Shows helpful error message for typos or invalid commands
+  - Suggests correct usage and points to help
+  - Example: `ailock foobar` → "Error: Unknown command 'foobar'"
+
+##### 🎨 Improved User Experience
+- **Faster workflows**: Lock/unlock files with fewer keystrokes
+- **Intelligent path detection**: Automatically distinguishes between commands and file paths
+- **Backwards compatible**: All original commands (`ailock lock`, `ailock status`, etc.) still work
+- **Clear error messages**: Better guidance when commands are mistyped
+
+#### Examples
+```bash
+# Quick status check
+ailock
+
+# Quick lock
+ailock sensitive.env
+ailock src/*.js
+ailock config/
+
+# Quick unlock  
+aiunlock sensitive.env
+
+# Traditional usage still works
+ailock lock file.txt
+ailock status --verbose
+```
+
+## [1.2.1] - 2025-08-05
+
+### 🐛 Bug Fixes
+
+#### Fixed `isLocked` Method False Positives
+- **Issue**: Files were incorrectly reported as "already locked" when they didn't exist or were outside the project directory
+- **Root Cause**: The `isLocked` method was returning `true` for any error, including:
+  - Non-existent files (ENOENT errors)
+  - Path validation errors for files outside the project
+  - Other unexpected errors
+- **Solution**: Improved error handling to properly distinguish between:
+  - `ENOENT` (file not found) → returns `false`
+  - `EACCES` (permission denied) → returns `true` (file is genuinely locked)
+  - Other errors → returns `false` (prevents false positives)
+- **Impact**: Users will now see correct messages:
+  - Non-existent files: "No files found to lock" instead of "Skipped 1 already locked file(s)"
+  - Files outside project: Properly handled without false lock status
+
 ## [1.2.0] - 2025-01-08
 
 ### 🚀 Major Simplification Update - Ultimate User Experience

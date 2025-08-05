@@ -50,3 +50,4 @@ logs/
 # Testing artifacts
 .ailock.session
 test-results/
+.test-temp/

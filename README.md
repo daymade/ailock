@@ -248,6 +248,57 @@ ailock generate --dry-run                 # Preview without creating files
 - `docker-production` - Production Dockerfile with ailock integration
 - `devcontainer` - VS Code Dev Container with ailock setup
 
+#### `ailock completion`
+Generate shell completion scripts for enhanced CLI experience.
+```bash
+ailock completion bash                    # Generate bash completion script
+ailock completion zsh                     # Generate zsh completion script
+ailock completion fish                    # Generate fish completion script
+ailock completion powershell              # Generate PowerShell completion script
+ailock completion bash --install-instructions  # Show installation instructions
+```
+
+#### `ailock setup-completion`
+Interactive setup for shell completions.
+```bash
+ailock setup-completion    # Auto-detect shell and show setup instructions
+```
+
+**Shell Completion Features:**
+- **Command completion**: Auto-complete all ailock commands
+- **Option completion**: Smart suggestions for command options
+- **File path completion**: Context-aware file suggestions based on .ailock patterns
+- **Dynamic completions**: 
+  - `ailock lock <TAB>` suggests unlocked files
+  - `ailock unlock <TAB>` suggests locked files
+  - `ailock generate <TAB>` suggests available templates
+
+**Installation Examples:**
+
+Bash:
+```bash
+# Add to ~/.bashrc
+source <(ailock completion bash)
+```
+
+Zsh:
+```bash
+# Add to ~/.zshrc
+source <(ailock completion zsh)
+```
+
+Fish:
+```bash
+# Save to completions directory
+ailock completion fish > ~/.config/fish/completions/ailock.fish
+```
+
+PowerShell:
+```powershell
+# Add to $PROFILE
+ailock completion powershell | Out-String | Invoke-Expression
+```
+
 ## 🔧 Cross-Platform Support
 
 ailock works consistently across all major platforms:

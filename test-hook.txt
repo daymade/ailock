@@ -1,3 +1,0 @@
-This is a test file to verify the Git hook functionality.
-It contains sensitive data that should be protected.
-This line was added to test the pre-commit hook.

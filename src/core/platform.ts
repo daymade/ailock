@@ -69,6 +69,11 @@ class UnixAdapter implements PlatformAdapter {
       const safePath = await this.pathValidator.validateAndSanitizePath(filePath);
       await this.pathValidator.validatePathType(safePath, 'file');
       
+      // Check if already locked to avoid errors
+      if (await this.isLocked(filePath)) {
+        return; // Already locked, nothing to do
+      }
+      
       // Acquire atomic lock for the operation
       const lockId = await this.atomicManager.acquireLock(safePath, {
         timeout: 10000,
@@ -251,8 +256,21 @@ class UnixAdapter implements PlatformAdapter {
       // Check write access
       await access(safePath, constants.W_OK);
       return false; // If no error, file is writable
-    } catch {
-      return true; // If error, file is not writable (locked)
+    } catch (error: any) {
+      // Handle specific error cases
+      if (error.code === 'ENOENT') {
+        // File doesn't exist, so it can't be locked
+        return false;
+      } else if (error.code === 'EACCES' || error.code === 'EPERM') {
+        // Permission denied - file is locked/read-only
+        // EACCES: Linux/Unix read-only
+        // EPERM: macOS with immutable flag (uchg)
+        return true;
+      }
+      
+      // For other errors (including path validation), treat as not locked
+      // This prevents false positives for files outside the project
+      return false;
     }
   }
 
@@ -338,6 +356,11 @@ class WindowsAdapter implements PlatformAdapter {
       const safePath = await this.pathValidator.validateAndSanitizePath(filePath);
       await this.pathValidator.validatePathType(safePath, 'file');
       
+      // Check if already locked to avoid errors
+      if (await this.isLocked(filePath)) {
+        return; // Already locked, nothing to do
+      }
+      
       // Acquire atomic lock for the operation
       const lockId = await this.atomicManager.acquireLock(safePath, {
         timeout: 10000,
@@ -419,8 +442,21 @@ class WindowsAdapter implements PlatformAdapter {
       // Check write access
       await access(safePath, constants.W_OK);
       return false; // If no error, file is writable
-    } catch {
-      return true; // If error, file is not writable (locked)
+    } catch (error: any) {
+      // Handle specific error cases
+      if (error.code === 'ENOENT') {
+        // File doesn't exist, so it can't be locked
+        return false;
+      } else if (error.code === 'EACCES' || error.code === 'EPERM') {
+        // Permission denied - file is locked/read-only
+        // EACCES: Linux/Unix read-only
+        // EPERM: macOS with immutable flag (uchg)
+        return true;
+      }
+      
+      // For other errors (including path validation), treat as not locked
+      // This prevents false positives for files outside the project
+      return false;
     }
   }
 

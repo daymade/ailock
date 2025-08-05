@@ -2,6 +2,8 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
 import { lockCommand } from './commands/lock.js';
 import { unlockCommand } from './commands/unlock.js';
 import { statusCommand } from './commands/status.js';
@@ -12,13 +14,72 @@ import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { generateCommand } from './commands/generate.js';
 import { diagnoseCommand } from './commands/diagnose.js';
+import { completionCommand, setupCompletionCommand } from './commands/completion.js';
+import { completionHelperCommand } from './commands/completion-helper.js';
 
 const program = new Command();
 
+// Detect if called as 'aiunlock'
+const isAiunlock = process.argv[1]?.endsWith('aiunlock');
+
+// Smart command routing for better UX
+function handleSmartRouting() {
+  const args = process.argv.slice(2);
+  
+  // If no arguments, show status
+  if (args.length === 0) {
+    process.argv.push('status');
+    return;
+  }
+  
+  // If first argument exists and is not a known command, check if it's a path
+  const firstArg = args[0];
+  const knownCommands = [
+    'init', 'lock', 'unlock', 'status', 'status-interactive', 
+    'list', 'generate', 'install-hooks', 'diagnose', 'pre-commit-check',
+    'completion', 'setup-completion', 'completion-helper',
+    '--help', '-h', '--version', '-V'
+  ];
+  
+  if (!knownCommands.includes(firstArg) && !firstArg.startsWith('-')) {
+    // Check if it's a valid path (file or directory)
+    try {
+      const resolvedPath = resolve(firstArg);
+      
+      // Check if it's an existing file/directory OR a glob pattern
+      const isPath = existsSync(resolvedPath) || 
+                     firstArg.includes('*') || 
+                     firstArg.includes('/') ||
+                     firstArg.includes('\\');
+      
+      if (isPath) {
+        // It's a path, so treat it as lock/unlock command
+        if (isAiunlock) {
+          process.argv.splice(2, 0, 'unlock');
+        } else {
+          process.argv.splice(2, 0, 'lock');
+        }
+      } else {
+        // Not a path, it's an unknown command - show error and help
+        console.error(chalk.red(`Error: Unknown command '${firstArg}'`));
+        console.error(chalk.yellow(`\nDid you mean to lock a file? Use: ${isAiunlock ? 'aiunlock' : 'ailock'} <file-path>`));
+        console.error(chalk.gray(`\nRun '${isAiunlock ? 'aiunlock' : 'ailock'} --help' to see available commands`));
+        process.exit(1);
+      }
+    } catch {
+      // If path resolution fails, show status
+      process.argv = process.argv.slice(0, 2).concat(['status']);
+    }
+  }
+}
+
+// Apply smart routing
+handleSmartRouting();
+
 program
-  .name('ailock')
+  .name(isAiunlock ? 'aiunlock' : 'ailock')
   .description('AI-Proof File Guard - Protect sensitive files from accidental AI modifications')
-  .version('1.0.0');
+  .version('1.3.0');
 
 // Add commands
 program.addCommand(initCommand);
@@ -30,9 +91,12 @@ program.addCommand(listCommand);
 program.addCommand(generateCommand);
 program.addCommand(installHooksCommand);
 program.addCommand(diagnoseCommand);
+program.addCommand(completionCommand);
+program.addCommand(setupCompletionCommand);
 
-// Command for Git hook integration (internal use)
+// Hidden commands
 program.addCommand(preCommitCheckCommand);
+program.addCommand(completionHelperCommand);
 
 // Global error handling
 process.on('uncaughtException', (error) => {
