@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-08-05
+
+### 🚀 Shell Auto-Completion Support
+
+#### New Features
+
+##### 🎯 Tab Completion for Enhanced CLI Experience
+- **New `completion` command**: Generates shell-specific completion scripts
+  - Supports bash, zsh, fish, and PowerShell
+  - Example: `ailock completion bash > ~/.ailock-completion`
+- **New `setup-completion` command**: Interactive setup wizard
+  - Auto-detects current shell
+  - Provides step-by-step installation instructions
+- **Context-aware completions**:
+  - `ailock lock <TAB>` → suggests only unlocked files
+  - `ailock unlock <TAB>` → suggests only locked files
+  - `ailock generate <TAB>` → lists available templates
+  - Command and option completions for all commands
+
+##### 🔧 Dynamic Completion Features
+- **File path completions**: Based on .ailock configuration patterns
+- **Pattern suggestions**: Common sensitive file patterns
+- **Performance optimized**: 
+  - Lazy loading support for fast shell startup
+  - Limited suggestions (max 50) to prevent slowdown
+  - Fallback for systems without bash-completion
+- **Hidden `completion-helper` command**: Provides dynamic completions
+
+#### Technical Improvements
+- Added `omelette` dependency for cross-shell completion support
+- Hybrid completion approach: static scripts with dynamic suggestions
+- Compatible with all major shells across Linux, macOS, and Windows
+
+#### Documentation
+- Updated README with detailed completion installation instructions
+- Added shell-specific setup examples
+- Enhanced CLAUDE.md with completion testing guidelines
+
 ## [1.3.0] - 2025-08-05
 
 ### 🎯 Smart Command Routing & Enhanced User Experience
