@@ -3,11 +3,13 @@ import { render } from 'ink';
 import React from 'react';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { InitWizard } from '../ui/components/InitWizard.js';
 import { isGitRepository, installPreCommitHook, getRepoRoot } from '../core/git.js';
 import { loadConfig, findProtectedFiles } from '../core/config.js';
 import { getPlatformAdapter } from '../core/platform.js';
+import { homedir } from 'os';
+import path from 'path';
 
 /**
  * Detect project type based on existing files
@@ -97,6 +99,71 @@ ${patterns.map(pattern => pattern.startsWith('!') ? pattern : pattern).join('\n'
 }
 
 /**
+ * Setup AI tool documentation (CLAUDE.md)
+ */
+async function setupAIDocumentation(): Promise<void> {
+  const claudeDir = path.join(homedir(), '.claude');
+  if (!existsSync(claudeDir)) {
+    await mkdir(claudeDir, { recursive: true });
+  }
+  
+  const claudeMdPath = path.join(claudeDir, 'CLAUDE.md');
+  const protectionInstructions = `
+## AILock File Protection
+
+IMPORTANT: Before modifying any file, check if it's protected by ailock.
+
+### Protection Check Process
+
+1. Before any file modification, run:
+   \`\`\`bash
+   ailock status <file-path>
+   \`\`\`
+
+2. If the file is locked (shows 🔒), you MUST NOT modify it directly.
+
+3. If modification is necessary, inform the user:
+   - The file is protected by ailock
+   - They need to explicitly unlock it: \`ailock unlock <file-path>\`
+   - After modifications, lock it again: \`ailock lock <file-path>\`
+
+### Why This Matters
+
+Files are locked to prevent accidental modifications of:
+- Production configuration files
+- Security-sensitive files (private keys, certificates)
+- Critical system files
+- Files that should remain stable
+
+### Error Handling
+
+If you encounter permission errors when trying to modify a file:
+1. Check if it's protected: \`ailock status <file-path>\`
+2. If protected, inform the user and ask for explicit permission to unlock
+3. Never try to force modifications or change file permissions without user consent
+
+Remember: Protected files can be read but not written. This is by design.
+`;
+  
+  if (existsSync(claudeMdPath)) {
+    const existingContent = await import('fs').then(fs => 
+      fs.promises.readFile(claudeMdPath, 'utf-8')
+    );
+    
+    if (!existingContent.includes('AILock File Protection')) {
+      await writeFile(
+        claudeMdPath, 
+        existingContent + '\n' + protectionInstructions,
+        'utf-8'
+      );
+      return;
+    }
+  } else {
+    await writeFile(claudeMdPath, protectionInstructions.trim(), 'utf-8');
+  }
+}
+
+/**
  * Complete project security setup
  */
 async function performCompleteSetup(options: any): Promise<void> {
@@ -160,8 +227,20 @@ async function performCompleteSetup(options: any): Promise<void> {
     console.log(chalk.gray('   💡 Run: ailock lock (later)'));
   }
 
-  // Step 5: Show status and next steps
-  console.log(chalk.cyan('\n📊 Step 5: Project Status'));
+  // Step 5: Setup AI documentation (if requested)
+  if (options.withAiDocs) {
+    console.log(chalk.cyan('\n📖 Step 5: AI Tool Documentation'));
+    try {
+      await setupAIDocumentation();
+      console.log(chalk.green('   ✅ Created AI tool protection documentation'));
+      console.log(chalk.gray('   📍 Location: ~/.claude/CLAUDE.md'));
+    } catch (error) {
+      console.log(chalk.yellow('   ⚠️  Could not create AI documentation'));
+    }
+  }
+
+  // Step 6: Show status and next steps
+  console.log(chalk.cyan(`\n📊 Step ${options.withAiDocs ? '6' : '5'}: Project Status`));
   console.log(chalk.green('🎉 Setup Complete! Your project is now AI-proof.'));
   
   console.log(chalk.blue.bold('\n💡 Quick Commands:'));
@@ -181,6 +260,7 @@ export const initCommand = new Command('init')
   .option('-f, --force', 'Overwrite existing configuration and hooks')
   .option('--interactive', 'Use detailed interactive wizard for custom setup')
   .option('--config-only', 'Only create .ailock configuration file')
+  .option('--with-ai-docs', 'Create AI tool documentation (CLAUDE.md) for enhanced protection')
   .action(async (options) => {
     try {
       // Check if .ailock already exists

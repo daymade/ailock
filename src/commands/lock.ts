@@ -91,6 +91,11 @@ export const lockCommand = new Command('lock')
           console.log(chalk.red(`   Failed to lock ${errorCount} file(s)`));
           process.exit(1);
         }
+        
+        // Basic info about protection
+        if (lockedCount > 0 && options.verbose) {
+          console.log(chalk.gray('\n   Files are protected with OS-level read-only permissions.'));
+        }
       }
     } catch (error) {
       console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
