@@ -31,8 +31,7 @@ export class AtomicFileManager {
   private readonly lockCleanupTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(private readonly workingDir: string = process.cwd()) {
-    // Ensure lock directory exists
-    this.initializeLockDirectory();
+    // Lock directory will be created on first use
   }
 
   /**
@@ -45,6 +44,9 @@ export class AtomicFileManager {
     const resolvedPath = path.resolve(this.workingDir, filePath);
     const lockId = randomBytes(16).toString('hex');
     const timeout = options.timeout || this.defaultTimeout;
+
+    // Ensure lock directory exists
+    await this.ensureLockDirectory();
 
     try {
       // Check if file is already locked by this process
@@ -65,6 +67,9 @@ export class AtomicFileManager {
         realpath: false, // Don't resolve symlinks for security
       });
 
+      // Store lock in memory first
+      this.activeLocks.set(resolvedPath, lockId);
+
       // Create lock metadata
       const lockInfo: LockInfo = {
         lockId,
@@ -76,9 +81,8 @@ export class AtomicFileManager {
         checksum: undefined,
       };
 
-      // Store lock information
-      await this.storeLockInfo(resolvedPath, lockInfo);
-      this.activeLocks.set(resolvedPath, lockId);
+      // Store lock information (non-critical - don't fail if this fails)
+      await this.storeLockInfo(resolvedPath, lockInfo).catch(() => {});
 
       // Set automatic cleanup timer
       const cleanupTimer = setTimeout(() => {
@@ -339,13 +343,16 @@ export class AtomicFileManager {
   }
 
   /**
-   * Initialize lock directory
+   * Ensure lock directory exists
    */
-  private async initializeLockDirectory(): Promise<void> {
+  private async ensureLockDirectory(): Promise<void> {
     try {
       await mkdir(this.getLockDir(), { recursive: true, mode: 0o755 });
     } catch (error) {
-      console.warn(`Failed to create lock directory: ${error}`);
+      // Directory may already exist, which is fine
+      if ((error as any).code !== 'EEXIST') {
+        console.warn(`Failed to create lock directory: ${error}`);
+      }
     }
   }
 
@@ -361,7 +368,12 @@ export class AtomicFileManager {
    */
   private async storeLockInfo(filePath: string, lockInfo: LockInfo): Promise<void> {
     const metadataPath = `${filePath}.ailock-meta`;
-    await writeFileAtomic(metadataPath, JSON.stringify(lockInfo, null, 2));
+    try {
+      await writeFileAtomic(metadataPath, JSON.stringify(lockInfo, null, 2));
+    } catch (error) {
+      // Non-critical - metadata is optional
+      console.debug(`Failed to store lock metadata: ${error}`);
+    }
   }
 
   /**

@@ -281,10 +281,8 @@ class UnixAdapter implements PlatformAdapter {
       // Validate file path
       const safePath = await this.pathValidator.validateAndSanitizePath(filePath);
       
-      // Check if file is currently locked by atomic manager
-      if (await this.atomicManager.isFileLocked(safePath)) {
-        return true;
-      }
+      // Don't check atomic manager here to avoid circular dependency
+      // Just check filesystem permissions
       
       // Check write access
       await access(safePath, constants.W_OK);
@@ -467,10 +465,8 @@ class WindowsAdapter implements PlatformAdapter {
       // Validate file path
       const safePath = await this.pathValidator.validateAndSanitizePath(filePath);
       
-      // Check if file is currently locked by atomic manager
-      if (await this.atomicManager.isFileLocked(safePath)) {
-        return true;
-      }
+      // Don't check atomic manager here to avoid circular dependency
+      // Just check filesystem permissions
       
       // Check write access
       await access(safePath, constants.W_OK);

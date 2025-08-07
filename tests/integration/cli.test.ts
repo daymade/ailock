@@ -34,7 +34,7 @@ describe('CLI Integration Tests', () => {
   it('should show version information', async () => {
     const { stdout } = await execAsync(`node "${cliPath}" --version`);
     
-    expect(stdout.trim()).toBe('1.3.0');
+    expect(stdout.trim()).toBe('1.5.0');
   });
 
   it('should lock and unlock files with configuration', async () => {
@@ -120,6 +120,9 @@ describe('CLI Integration Tests', () => {
       // Verify files are locked
       await expect(access(join(tempDir, '.env'), constants.W_OK)).rejects.toThrow();
       await expect(access(join(tempDir, 'config.json'), constants.W_OK)).rejects.toThrow();
+      
+      // Unlock files before cleanup to avoid permission errors
+      await execAsync(`node "${cliPath}" unlock .env config.json`);
     } finally {
       process.chdir(originalCwd);
     }
