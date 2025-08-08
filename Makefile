@@ -124,7 +124,7 @@ check-gh: ## Verify GitHub CLI is installed and authenticated
 .PHONY: check-remote
 check-remote: ## Verify git remote is up to date
 	$(call print_header,Checking remote status)
-	@git fetch $(GIT_REMOTE) $(MAIN_BRANCH)
+	@NO_PROXY=* git fetch $(GIT_REMOTE) $(MAIN_BRANCH)
 	@if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse $(GIT_REMOTE)/$(MAIN_BRANCH))" ]; then \
 		echo "$(RED)✗ Local branch is not up to date with $(GIT_REMOTE)/$(MAIN_BRANCH)$(RESET)"; \
 		echo "$(YELLOW)Run 'git pull' to update$(RESET)"; \
