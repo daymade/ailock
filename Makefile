@@ -86,6 +86,110 @@ version: ## Show current version and npm info
 	@echo "$(CYAN)Latest git tag:$(RESET)"
 	@git describe --tags --abbrev=0 2>/dev/null || echo "  No tags yet"
 
+# Comprehensive status
+.PHONY: status
+status: ## Show comprehensive release status
+	@echo "$(CYAN)═══════════════════════════════════════════════════════════$(RESET)"
+	@echo "$(CYAN)                    RELEASE STATUS REPORT$(RESET)"
+	@echo "$(CYAN)═══════════════════════════════════════════════════════════$(RESET)"
+	@echo ""
+	@echo "$(GREEN)📦 Package Information$(RESET)"
+	@echo "  Name:            $(PACKAGE_NAME)"
+	@echo "  Current Version: $(PACKAGE_VERSION)"
+	@echo "  Registry:        https://www.npmjs.com/package/$(PACKAGE_NAME)"
+	@echo ""
+	@echo "$(GREEN)🌐 NPM Registry$(RESET)"
+	@NPM_VERSION=$$(npm view $(PACKAGE_NAME) version 2>/dev/null); \
+	if [ -n "$$NPM_VERSION" ]; then \
+		echo "  Published Version: $$NPM_VERSION"; \
+		if [ "$$NPM_VERSION" = "$(PACKAGE_VERSION)" ]; then \
+			echo "  Status: $(GREEN)✓ Up to date$(RESET)"; \
+		else \
+			echo "  Status: $(YELLOW)⚠ Local version differs from npm$(RESET)"; \
+		fi; \
+		echo "  Downloads: $$(npm view $(PACKAGE_NAME) downloads.lastMonth 2>/dev/null || echo 'N/A') (last month)"; \
+	else \
+		echo "  Status: $(YELLOW)Not published yet$(RESET)"; \
+	fi
+	@echo ""
+	@echo "$(GREEN)🔧 Git Repository$(RESET)"
+	@echo "  Current Branch: $(GIT_BRANCH)"
+	@echo "  Remote: $$(git remote get-url origin 2>/dev/null || echo 'No remote')"
+	@LATEST_TAG=$$(git describe --tags --abbrev=0 2>/dev/null); \
+	if [ -n "$$LATEST_TAG" ]; then \
+		echo "  Latest Tag: $$LATEST_TAG"; \
+		TAG_VERSION=$${LATEST_TAG#v}; \
+		if [ "$$TAG_VERSION" = "$(PACKAGE_VERSION)" ]; then \
+			echo "  Tag Status: $(GREEN)✓ Matches package.json$(RESET)"; \
+		else \
+			echo "  Tag Status: $(YELLOW)⚠ Tag differs from package.json$(RESET)"; \
+		fi; \
+	else \
+		echo "  Latest Tag: No tags yet"; \
+	fi
+	@echo "  Commits since tag: $$(git rev-list --count $$(git describe --tags --abbrev=0 2>/dev/null)..HEAD 2>/dev/null || echo '0')"
+	@echo ""
+	@echo "$(GREEN)🚀 GitHub Releases$(RESET)"
+	@LATEST_RELEASE=$$(gh release view --json tagName,publishedAt,isDraft,isPrerelease 2>/dev/null); \
+	if [ -n "$$LATEST_RELEASE" ]; then \
+		echo "$$LATEST_RELEASE" | jq -r '"  Latest Release: \(.tagName)"'; \
+		echo "$$LATEST_RELEASE" | jq -r '"  Published: \(.publishedAt | split("T")[0])"'; \
+		RELEASE_STATUS=$$(echo "$$LATEST_RELEASE" | jq -r 'if .isDraft then "Draft" elif .isPrerelease then "Pre-release" else "Published" end'); \
+		if [ "$$RELEASE_STATUS" = "Draft" ]; then \
+			echo "  Status: $(YELLOW)$$RELEASE_STATUS$(RESET)"; \
+		elif [ "$$RELEASE_STATUS" = "Pre-release" ]; then \
+			echo "  Status: $(YELLOW)$$RELEASE_STATUS$(RESET)"; \
+		else \
+			echo "  Status: $(GREEN)$$RELEASE_STATUS$(RESET)"; \
+		fi; \
+	else \
+		echo "  Latest Release: $(YELLOW)No releases yet$(RESET)"; \
+	fi
+	@echo "  View releases: https://github.com/daymade/ailock/releases"
+	@echo ""
+	@echo "$(GREEN)✅ Environment Checks$(RESET)"
+	@echo -n "  Working Directory: "; \
+	if [ -z "$$(git status --porcelain)" ]; then \
+		echo "$(GREEN)Clean$(RESET)"; \
+	else \
+		echo "$(YELLOW)Has uncommitted changes$(RESET)"; \
+		git status --short | head -3 | sed 's/^/    /'; \
+		CHANGES=$$(git status --porcelain | wc -l | xargs); \
+		if [ "$$CHANGES" -gt "3" ]; then \
+			echo "    ... and $$(($$CHANGES - 3)) more files"; \
+		fi; \
+	fi
+	@echo -n "  NPM Auth: "; \
+	npm whoami >/dev/null 2>&1 && echo "$(GREEN)✓ Logged in as $$(npm whoami)$(RESET)" || echo "$(RED)✗ Not authenticated$(RESET)"
+	@echo -n "  GitHub CLI: "; \
+	gh auth status >/dev/null 2>&1 && echo "$(GREEN)✓ Authenticated$(RESET)" || echo "$(RED)✗ Not authenticated$(RESET)"
+	@echo -n "  Remote Sync: "; \
+	NO_PROXY=* git fetch $(GIT_REMOTE) $(MAIN_BRANCH) >/dev/null 2>&1; \
+	if [ "$$(git rev-parse HEAD)" = "$$(git rev-parse $(GIT_REMOTE)/$(MAIN_BRANCH) 2>/dev/null)" ]; then \
+		echo "$(GREEN)✓ Up to date with origin/main$(RESET)"; \
+	else \
+		BEHIND=$$(git rev-list --count HEAD..$(GIT_REMOTE)/$(MAIN_BRANCH) 2>/dev/null || echo "0"); \
+		AHEAD=$$(git rev-list --count $(GIT_REMOTE)/$(MAIN_BRANCH)..HEAD 2>/dev/null || echo "0"); \
+		if [ "$$BEHIND" -gt "0" ] && [ "$$AHEAD" -gt "0" ]; then \
+			echo "$(YELLOW)⚠ Diverged ($$AHEAD ahead, $$BEHIND behind)$(RESET)"; \
+		elif [ "$$BEHIND" -gt "0" ]; then \
+			echo "$(YELLOW)⚠ Behind by $$BEHIND commits$(RESET)"; \
+		elif [ "$$AHEAD" -gt "0" ]; then \
+			echo "$(YELLOW)⚠ Ahead by $$AHEAD commits$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠ Cannot determine sync status$(RESET)"; \
+		fi; \
+	fi
+	@echo ""
+	@echo "$(GREEN)📈 Next Versions$(RESET)"
+	@echo "  Patch: $(PACKAGE_VERSION) → $$(npx semver $(PACKAGE_VERSION) -i patch 2>/dev/null || echo 'N/A')"
+	@echo "  Minor: $(PACKAGE_VERSION) → $$(npx semver $(PACKAGE_VERSION) -i minor 2>/dev/null || echo 'N/A')"
+	@echo "  Major: $(PACKAGE_VERSION) → $$(npx semver $(PACKAGE_VERSION) -i major 2>/dev/null || echo 'N/A')"
+	@echo ""
+	@echo "$(CYAN)═══════════════════════════════════════════════════════════$(RESET)"
+	@echo "$(YELLOW)Ready to release? Use:$(RESET) make release-patch | release-minor | release-major"
+	@echo "$(CYAN)═══════════════════════════════════════════════════════════$(RESET)"
+
 # Safety checks
 .PHONY: check-clean
 check-clean: ## Verify working directory is clean
