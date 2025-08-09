@@ -294,7 +294,7 @@ async function performCompleteSetup(options: any): Promise<void> {
 }
 
 export const initCommand = new Command('init')
-  .description('🚀 Complete project security setup - one command to protect everything')
+  .description('Initialize project protection and configuration')
   .option('-f, --force', 'Overwrite existing configuration and hooks')
   .option('--interactive', 'Use detailed interactive wizard for custom setup')
   .option('--config-only', 'Only create .ailock configuration file')

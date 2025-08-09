@@ -8,7 +8,7 @@ import { lockCommand } from './commands/lock.js';
 import { unlockCommand } from './commands/unlock.js';
 import { statusCommand } from './commands/status.js';
 import { statusInteractiveCommand } from './commands/status-interactive.js';
-import { installHooksCommand } from './commands/install-hooks.js';
+// Removed - duplicate functionality now in 'hooks' command
 import { preCommitCheckCommand } from './commands/pre-commit-check.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -37,8 +37,8 @@ function handleSmartRouting() {
   const firstArg = args[0];
   const knownCommands = [
     'init', 'lock', 'unlock', 'status', 'status-interactive', 
-    'list', 'generate', 'install-hooks', 'diagnose', 'pre-commit-check',
-    'completion', 'setup-completion', 'completion-helper', 'hooks',
+    'list', 'generate', 'hooks', 'diagnose', 'pre-commit-check',
+    'completion', 'setup-completion', 'completion-helper',
     '--help', '-h', '--version', '-V'
   ];
   
@@ -90,8 +90,7 @@ program.addCommand(statusCommand);
 program.addCommand(statusInteractiveCommand);
 program.addCommand(listCommand);
 program.addCommand(generateCommand);
-program.addCommand(installHooksCommand);
-program.addCommand(hooksCommand);
+program.addCommand(hooksCommand); // Consolidated hook management
 program.addCommand(diagnoseCommand);
 program.addCommand(completionCommand);
 program.addCommand(setupCompletionCommand);

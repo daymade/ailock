@@ -7,7 +7,7 @@ import { HooksService } from '../services/HooksService.js';
  * Follows Open/Closed Principle - easy to add new AI tools
  */
 export const hooksCommand = new Command('hooks')
-  .description('🤖 Manage AI tool protection hooks')
+  .description('Manage AI tool and Git protection hooks')
   .action(() => {
     // Show help if no subcommand provided
     hooksCommand.outputHelp();
@@ -120,6 +120,39 @@ const listCommand = new Command('list')
   });
 
 /**
+ * Git hooks subcommand (replaces old install-hooks command)
+ */
+const gitCommand = new Command('git')
+  .description('Install Git pre-commit hooks')
+  .option('-f, --force', 'Overwrite existing hooks')
+  .action(async (options: any) => {
+    try {
+      // Import git functions
+      const { isGitRepository, installPreCommitHook, getRepoRoot } = await import('../core/git.js');
+      
+      const isGitRepo = await isGitRepository();
+      if (!isGitRepo) {
+        console.log(chalk.yellow('⚠️  Not a Git repository'));
+        console.log(chalk.gray('Git hooks can only be installed in Git repositories'));
+        process.exit(1);
+      }
+      
+      const repoRoot = await getRepoRoot();
+      if (!repoRoot) {
+        throw new Error('Could not determine Git repository root');
+      }
+      
+      await installPreCommitHook(repoRoot, options.force);
+      
+      console.log(chalk.green('✅ Git pre-commit hooks installed successfully'));
+      console.log(chalk.gray('Your locked files are now protected from accidental commits'));
+    } catch (error) {
+      console.error(chalk.red('❌ Failed to install Git hooks:'), error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+/**
  * Claude-specific shortcut command
  */
 const claudeCommand = new Command('claude')
@@ -147,6 +180,7 @@ hooksCommand.addCommand(installCommand);
 hooksCommand.addCommand(uninstallCommand);
 hooksCommand.addCommand(statusCommand);
 hooksCommand.addCommand(listCommand);
+hooksCommand.addCommand(gitCommand);
 hooksCommand.addCommand(claudeCommand);
 
 /**
