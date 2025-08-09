@@ -278,6 +278,13 @@ async function performCompleteSetup(options: any): Promise<void> {
   console.log(chalk.cyan(`\n📊 Step ${finalStep}: Project Status`));
   console.log(chalk.green('🎉 Setup Complete! Your project is now AI-proof.'));
   
+  // Quick start guide for first-time users
+  console.log(chalk.cyan('\n📚 Quick Start Guide:'));
+  console.log(chalk.gray('   1. Lock sensitive files:    ') + chalk.white('ailock lock .env'));
+  console.log(chalk.gray('   2. Check protection status: ') + chalk.white('ailock status'));
+  console.log(chalk.gray('   3. Unlock when needed:      ') + chalk.white('ailock unlock .env'));
+  console.log(chalk.gray('\n   Learn more: ') + chalk.blue('https://github.com/qpd-v/ailock'));
+  
   console.log(chalk.blue.bold('\n💡 Quick Commands:'));
   console.log(chalk.gray('   ailock status           # Check protection status'));
   console.log(chalk.gray('   ailock lock             # Protect more files'));
@@ -302,6 +309,13 @@ export const initCommand = new Command('init')
   .option('--no-ai-hooks', 'Skip automatic AI tool hook installation')
   .action(async (options) => {
     try {
+      // First-run welcome message
+      const isFirstRun = !existsSync('.ailock');
+      if (isFirstRun && !options.force) {
+        console.log(chalk.cyan('\n🔒 Welcome to AILock!'));
+        console.log(chalk.gray('   Protecting your sensitive files from AI modifications\n'));
+      }
+      
       // Check if .ailock already exists
       if (existsSync('.ailock') && !options.force) {
         console.log(chalk.yellow('⚠️  .ailock file already exists'));

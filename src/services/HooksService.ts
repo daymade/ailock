@@ -31,16 +31,18 @@ export interface HookStatus {
 /**
  * Hook configuration for Claude Code
  */
+interface PreToolUseHook {
+  matcher: string;
+  hooks: Array<{
+    type: string;
+    command: string;
+    timeout?: number;
+  }>;
+}
+
 interface HookConfig {
   hooks: {
-    PreToolUse: Array<{
-      matcher: string;
-      hooks: Array<{
-        type: string;
-        command: string;
-        timeout?: number;
-      }>;
-    }>;
+    PreToolUse: PreToolUseHook[];
   };
 }
 
@@ -191,7 +193,7 @@ export class HooksService {
    * Merge hook configuration with existing settings
    * DRY - extracted from install logic for reuse
    */
-  private async mergeSettings(settingsPath: string, hookConfig: HookConfig): Promise<any> {
+  private async mergeSettings(settingsPath: string, hookConfig: HookConfig): Promise<HookConfig> {
     let existingSettings = {};
     
     if (existsSync(settingsPath)) {
@@ -213,9 +215,9 @@ export class HooksService {
     const mergedSettings = {
       ...existingSettings,
       hooks: {
-        ...(existingSettings as any).hooks,
+        ...(existingSettings as HookConfig).hooks,
         PreToolUse: [
-          ...((existingSettings as any).hooks?.PreToolUse || []),
+          ...((existingSettings as HookConfig).hooks?.PreToolUse || []),
           ...hookConfig.hooks.PreToolUse
         ]
       }
@@ -224,7 +226,7 @@ export class HooksService {
     // Remove duplicates based on command path
     if (mergedSettings.hooks.PreToolUse.length > 1) {
       const seen = new Set();
-      mergedSettings.hooks.PreToolUse = mergedSettings.hooks.PreToolUse.filter((item: any) => {
+      mergedSettings.hooks.PreToolUse = mergedSettings.hooks.PreToolUse.filter((item) => {
         const key = item.hooks?.[0]?.command;
         if (key && seen.has(key)) {
           return false;
@@ -255,7 +257,7 @@ export class HooksService {
       
       if (settings.hooks?.PreToolUse) {
         // Filter out ailock hooks
-        settings.hooks.PreToolUse = settings.hooks.PreToolUse.filter((item: any) => {
+        settings.hooks.PreToolUse = settings.hooks.PreToolUse.filter((item: PreToolUseHook) => {
           const command = item.hooks?.[0]?.command;
           return !command || !command.includes('claude-ailock-hook');
         });
@@ -281,7 +283,7 @@ export class HooksService {
    * Open for extension - can add more AI tools
    */
   public async getHookStatus(tool: string): Promise<HookStatus> {
-    if (!this.SUPPORTED_TOOLS.includes(tool as any)) {
+    if (!this.SUPPORTED_TOOLS.includes(tool as typeof this.SUPPORTED_TOOLS[number])) {
       return {
         installed: false,
         error: `Tool '${tool}' is not supported. Supported tools: ${this.SUPPORTED_TOOLS.join(', ')}`
@@ -311,7 +313,7 @@ export class HooksService {
         const content = await readFile(settingsPath, 'utf-8');
         const settings = JSON.parse(content);
         
-        const ailockHooks = settings.hooks?.PreToolUse?.filter((item: any) => {
+        const ailockHooks = settings.hooks?.PreToolUse?.filter((item: PreToolUseHook) => {
           const command = item.hooks?.[0]?.command;
           return command && command.includes('claude-ailock-hook');
         });

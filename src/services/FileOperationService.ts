@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import { resolve } from 'path';
 import { loadConfig, findProtectedFiles } from '../core/config.js';
 import { getPlatformAdapter } from '../core/platform.js';
+import { info, success, warn, error } from '../utils/output.js';
 
 /**
  * Options for file operations
@@ -64,7 +65,7 @@ export class FileOperationService {
     // Process each file
     for (const file of filesToProcess) {
       if (options.dryRun) {
-        console.log(chalk.gray(`  Would ${operation}: ${file}`));
+        info(chalk.gray(`  Would ${operation}: ${file}`));
         result.successful.push(file);
         continue;
       }
@@ -75,7 +76,7 @@ export class FileOperationService {
         
         if (operation === 'lock' && isLocked) {
           if (options.verbose) {
-            console.log(chalk.gray(`  ℹ️  Already locked: ${file}`));
+            info(chalk.gray(`  ℹ️  Already locked: ${file}`));
           }
           result.skipped.push(file);
           continue;
@@ -83,7 +84,7 @@ export class FileOperationService {
         
         if (operation === 'unlock' && !isLocked) {
           if (options.verbose) {
-            console.log(chalk.gray(`  ℹ️  Already unlocked: ${file}`));
+            info(chalk.gray(`  ℹ️  Already unlocked: ${file}`));
           }
           result.skipped.push(file);
           continue;
@@ -100,14 +101,14 @@ export class FileOperationService {
         
         if (options.verbose) {
           const icon = operation === 'lock' ? '🔒' : '🔓';
-          console.log(chalk.green(`  ${icon} ${file}`));
+          info(chalk.green(`  ${icon} ${file}`));
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         result.failed.push({ file, error: errorMessage });
         
         if (options.verbose) {
-          console.log(chalk.red(`  ❌ Failed to ${operation} ${file}: ${errorMessage}`));
+          console.error(`  ❌ Failed to ${operation} ${file}: ${errorMessage}`);
         }
       }
     }
@@ -139,7 +140,7 @@ export class FileOperationService {
           });
           files.push(...matchedFiles);
         } else {
-          console.log(chalk.yellow(`⚠️  File not found: ${pattern}`));
+          warn(`⚠️  File not found: ${pattern}`);
         }
       }
       
@@ -163,18 +164,18 @@ export class FileOperationService {
    */
   private displayOperationStart(operation: 'lock' | 'unlock', files: string[]): void {
     const action = operation === 'lock' ? 'lock' : 'unlock';
-    console.log(chalk.cyan(`Found ${files.length} file(s) to ${action}:`));
+    info(chalk.cyan(`Found ${files.length} file(s) to ${action}:`));
     
     for (const file of files.slice(0, 10)) {
       const icon = operation === 'lock' ? '🔒' : '🔓';
-      console.log(chalk.gray(`  ${icon} ${file}`));
+      info(chalk.gray(`  ${icon} ${file}`));
     }
     
     if (files.length > 10) {
-      console.log(chalk.gray(`  ... and ${files.length - 10} more`));
+      info(chalk.gray(`  ... and ${files.length - 10} more`));
     }
     
-    console.log(); // Empty line for readability
+    info(''); // Empty line for readability
   }
 
   /**
@@ -182,34 +183,34 @@ export class FileOperationService {
    */
   public displaySummary(operation: 'lock' | 'unlock', result: FileOperationResult, options: FileOperationOptions): void {
     if (options.dryRun) {
-      console.log(chalk.yellow(`\n🔍 Dry run completed. ${result.totalFiles} file(s) would be ${operation}ed.`));
+      info(chalk.yellow(`\n🔍 Dry run completed. ${result.totalFiles} file(s) would be ${operation}ed.`));
       return;
     }
 
     // Success summary
     if (result.successful.length > 0) {
       const action = operation === 'lock' ? 'Locked' : 'Unlocked';
-      console.log(chalk.green(`✅ ${action} ${result.successful.length} file(s)`));
+      success(`✅ ${action} ${result.successful.length} file(s)`);
     }
 
     // Skipped summary
     if (result.skipped.length > 0 && options.verbose) {
       const state = operation === 'lock' ? 'already locked' : 'already unlocked';
-      console.log(chalk.gray(`ℹ️  Skipped ${result.skipped.length} file(s) (${state})`));
+      info(chalk.gray(`ℹ️  Skipped ${result.skipped.length} file(s) (${state})`));
     }
 
     // Failed summary
     if (result.failed.length > 0) {
-      console.log(chalk.red(`\n❌ Failed to ${operation} ${result.failed.length} file(s):`));
-      for (const { file, error } of result.failed) {
-        console.log(chalk.red(`  • ${file}: ${error}`));
+      error(`\n❌ Failed to ${operation} ${result.failed.length} file(s):`);
+      for (const failedItem of result.failed) {
+        error(`  • ${failedItem.file}: ${failedItem.error}`);
       }
     }
 
     // Additional hints
     if (operation === 'unlock' && result.successful.length > 0) {
-      console.log(chalk.yellow('\n⚠️  Remember to lock these files again after editing!'));
-      console.log(chalk.gray('   Run: ailock lock'));
+      warn('\n⚠️  Remember to lock these files again after editing!');
+      info(chalk.gray('   Run: ailock lock'));
     }
   }
 }

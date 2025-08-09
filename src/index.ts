@@ -20,8 +20,19 @@ import { hooksCommand } from './commands/hooks.js';
 
 const program = new Command();
 
+// Global options
+program
+  .option('-q, --quiet', 'Suppress informational output');
+
 // Detect if called as 'aiunlock'
 const isAiunlock = process.argv[1]?.endsWith('aiunlock');
+
+// Check if quiet mode is enabled
+export function isQuietMode(): boolean {
+  const quietIndex = process.argv.indexOf('--quiet');
+  const qIndex = process.argv.indexOf('-q');
+  return quietIndex !== -1 || qIndex !== -1;
+}
 
 // Smart command routing for better UX
 function handleSmartRouting() {
