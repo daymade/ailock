@@ -156,6 +156,7 @@ export async function getRepoStatus(cwd?: string): Promise<RepoStatus> {
 
 /**
  * Generate pre-commit hook script content
+ * Uses null-terminated file processing to prevent shell injection
  */
 export function generatePreCommitHook(): string {
   return `#!/bin/sh
@@ -174,16 +175,27 @@ if ! command -v ailock >/dev/null 2>&1; then
     exit 0
 fi
 
-# Get list of staged files
-staged_files=$(git diff --cached --name-only)
-
-if [ -z "$staged_files" ]; then
+# Check if there are any staged files
+if [ -z "$(git diff --cached --name-only)" ]; then
     exit 0
 fi
 
-# Run ailock pre-commit check
 echo "🔒 Checking for modifications to locked files..."
-if ! ailock pre-commit-check $staged_files; then
+
+# Process files safely using null delimiter to handle special characters in filenames
+# This prevents shell injection attacks from malicious filenames
+check_failed=0
+git diff --cached --name-only -z | while IFS= read -r -d '' filename; do
+    if [ -n "$filename" ]; then
+        # Pass each filename as a properly quoted argument
+        if ! ailock pre-commit-check "$filename"; then
+            check_failed=1
+            break
+        fi
+    fi
+done || check_failed=1
+
+if [ $check_failed -eq 1 ]; then
     echo ""
     echo "❌ Commit blocked: Attempted to modify locked files"
     echo "💡 To edit these files:"

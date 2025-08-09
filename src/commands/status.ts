@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'path';
+import { render } from 'ink';
+import React from 'react';
 import { getRepoStatus, RepoStatus } from '../core/git.js';
 
 /**
@@ -105,12 +107,28 @@ function showDetailedStatus(status: RepoStatus): void {
 }
 
 export const statusCommand = new Command('status')
+  .alias('dash')
   .description('Show current ailock protection status')
+  .option('-i, --interactive', 'Show interactive status dashboard with real-time updates')
   .option('-v, --verbose', 'Show detailed information')
   .option('--simple', 'Force simple non-interactive output')
   .option('--json', 'Output status as JSON')
   .action(async (options) => {
     try {
+      // Handle interactive dashboard
+      if (options.interactive) {
+        const { StatusDashboard } = await import('../ui/components/StatusDashboard.js');
+        const { waitUntilExit } = render(
+          React.createElement(StatusDashboard, {
+            verbose: options.verbose,
+            onExit: () => process.exit(0)
+          })
+        );
+        
+        await waitUntilExit();
+        return;
+      }
+
       const status = await getRepoStatus();
       
       if (options.json) {

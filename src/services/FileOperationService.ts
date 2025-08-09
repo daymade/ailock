@@ -199,18 +199,77 @@ export class FileOperationService {
       info(chalk.gray(`ℹ️  Skipped ${result.skipped.length} file(s) (${state})`));
     }
 
-    // Failed summary
+    // Failed summary with helpful suggestions
     if (result.failed.length > 0) {
       error(`\n❌ Failed to ${operation} ${result.failed.length} file(s):`);
       for (const failedItem of result.failed) {
         error(`  • ${failedItem.file}: ${failedItem.error}`);
       }
+
+      // Provide helpful suggestions based on operation and error types
+      this.displayErrorSuggestions(operation, result.failed);
     }
 
     // Additional hints
     if (operation === 'unlock' && result.successful.length > 0) {
       warn('\n⚠️  Remember to lock these files again after editing!');
-      info(chalk.gray('   Run: ailock lock'));
+      info(chalk.gray('💡 Consider using: ailock edit <filename> (auto-relock after editing)'));
+    }
+  }
+
+  /**
+   * Display helpful suggestions based on error types
+   */
+  private displayErrorSuggestions(operation: 'lock' | 'unlock', failures: Array<{file: string, error: string}>): void {
+    const permissionErrors = failures.filter(f => 
+      f.error.toLowerCase().includes('permission') || 
+      f.error.toLowerCase().includes('denied') ||
+      f.error.toLowerCase().includes('eperm')
+    );
+
+    const lockedErrors = failures.filter(f =>
+      f.error.toLowerCase().includes('locked') ||
+      f.error.toLowerCase().includes('busy') ||
+      f.error.toLowerCase().includes('ebusy')
+    );
+
+    const pathErrors = failures.filter(f =>
+      f.error.toLowerCase().includes('path') ||
+      f.error.toLowerCase().includes('directory') ||
+      f.error.toLowerCase().includes('outside allowed')
+    );
+
+    info(chalk.blue('\n💡 Helpful suggestions:'));
+
+    if (permissionErrors.length > 0) {
+      info(chalk.gray('   • Permission errors may require elevated privileges'));
+      info(chalk.gray('   • Try: sudo ailock ' + (operation === 'lock' ? 'lock' : 'unlock') + ' <file>'));
+      if (operation === 'unlock') {
+        info(chalk.gray('   • For editing: ailock edit <file> (handles permissions automatically)'));
+      }
+    }
+
+    if (lockedErrors.length > 0) {
+      info(chalk.gray('   • Files may be locked by another process'));
+      info(chalk.gray('   • Try: ailock emergency-unlock <file> (if files are stuck)'));
+      info(chalk.gray('   • Or: ailock doctor (diagnose lock issues)'));
+    }
+
+    if (pathErrors.length > 0) {
+      info(chalk.gray('   • Path validation is blocking access'));
+      info(chalk.gray('   • Ensure files are in your project directory'));
+      info(chalk.gray('   • Check file paths for special characters or suspicious patterns'));
+    }
+
+    // General suggestions
+    if (failures.length > 0) {
+      info(chalk.gray('   • Run: ailock doctor (comprehensive health check)'));
+      info(chalk.gray('   • Use: ailock diagnose <file> (detailed file analysis)'));
+      
+      if (operation === 'unlock' && failures.some(f => f.error.includes('permission'))) {
+        info(chalk.blue('\n🎯 Quick fix for editing:'));
+        info(chalk.gray('   ailock edit <file>  # Temporarily unlock, open editor, then relock'));
+      }
     }
   }
 }

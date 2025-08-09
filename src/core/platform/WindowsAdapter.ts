@@ -1,13 +1,19 @@
 import { Platform } from '../platform.js';
 import { BasePlatformAdapter } from './BasePlatformAdapter.js';
+import { SecureCommandExecutor } from '../../security/CommandExecutor.js';
 import path from 'path';
-import { execSync } from 'child_process';
 
 /**
  * Windows platform adapter for file locking
  */
 export class WindowsAdapter extends BasePlatformAdapter {
   protected platformType = Platform.WINDOWS;
+
+  constructor() {
+    super();
+    // Add Windows-specific commands to the allowed list
+    this.commandExecutor = new SecureCommandExecutor(['net']);
+  }
 
   /**
    * Lock a file on Windows
@@ -121,9 +127,9 @@ export class WindowsAdapter extends BasePlatformAdapter {
   /**
    * Check if running with administrator privileges
    */
-  private isAdmin(): boolean {
+  private async isAdmin(): Promise<boolean> {
     try {
-      execSync('net session', { stdio: 'ignore' });
+      await this.commandExecutor.executeCommand('net', ['session']);
       return true;
     } catch {
       return false;

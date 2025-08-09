@@ -1,3 +1,6 @@
+import { ErrorSanitizer } from './ErrorSanitizer.js';
+import { ErrorRecovery } from './ErrorRecovery.js';
+
 /**
  * Secure error handling that prevents information disclosure
  * and implements fail-safe security mechanisms
@@ -45,36 +48,8 @@ export interface ErrorHandlerOptions {
  */
 export class SecureErrorHandler {
   private readonly options: ErrorHandlerOptions;
-  private readonly sensitivePatterns = [
-    /\/Users\/[^\/\s]+/g,                  // macOS user directories
-    /\/home\/[^\/\s]+/g,                   // Linux home directories
-    /C:\\Users\\[^\\\s]+/g,                // Windows user directories
-    /C:\\[Tt]est[Dd]ir\\[^\\\s]+/g,           // Test directory patterns
-    /C:\\[^\\\s]*[Tt]est[^\\\s]*\\[^\\\s]+/g, // General test paths
-    /\/private\/etc/g,                     // macOS system paths
-    /\/root\//g,                           // Root directory access
-    /\/etc\/[^\/\s]+/g,                    // System configuration files
-    /password[:\s]*[^\s]+/gi,              // Password values
-    /secret[:\s]*[^\s]+/gi,                // Secret values
-    /\b(bearer[_\s]?token|access[_\s]?token|auth[_\s]?token|jwt[_\s]?token|session[_\s]?token)[:\s]*[^\s]+/gi, // Specific token types
-    /\b(private[_\s]?key|public[_\s]?key|api[_\s]?key|access[_\s]?key|ssh[_\s]?key)[:\s]*[^\s]+/gi, // Specific key types  
-    /api[_-]?key[:\s]*[^\s]+/gi,           // API key values
-    /bearer[:\s]+[^\s]+/gi,                // Bearer tokens (standalone)
-    /\.\.\/\.\.\/\.\.\/[^\s]+/g,              // Path traversal patterns
-    /\.{4}\/\/\.{4}\/\/\.{4}\/\/[^\s]+/g,    // Dot-slash traversal
-    /\\x[0-9a-fA-F]{2}/g,                  // Hex escape sequences
-    /ssh-rsa\s+[A-Za-z0-9+\/]+/gi,        // SSH public keys
-    /postgresql:\/\/[^@\s]+:[^@\s]+@[^\s]+/gi, // Database connection strings
-    /[a-f0-9]{16,}/g,                      // Hex strings (potential hashes)
-    /sha256:[a-f0-9]+/gi,                  // SHA256 prefixed hashes
-    /[A-F0-9]{2}:[A-F0-9]{2}:[A-F0-9]{2}[A-F0-9:]+/g, // Certificate fingerprints
-    /[A-Za-z0-9+\/]{8,}={0,2}/g,          // Base64 strings
-    /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b/g, // IP addresses with optional ports
-    /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}\b/g, // CIDR notation
-    /[a-zA-Z0-9][a-zA-Z0-9\-]*\.internal\b/g, // Internal hostnames
-    /[a-zA-Z0-9][a-zA-Z0-9\-]*\.company\.com\b/g, // Company internal domains
-    /db-server-\d+\.internal\b/g,          // Database server hostnames
-  ];
+  private readonly sanitizer: ErrorSanitizer;
+  private readonly recovery: ErrorRecovery;
 
   private readonly errorMessages = new Map<string, string>([
     ['EACCES', 'Access denied'],
@@ -99,6 +74,9 @@ export class SecureErrorHandler {
       maxContextSize: 1024,
       ...options
     };
+    
+    this.sanitizer = new ErrorSanitizer();
+    this.recovery = new ErrorRecovery();
   }
 
   /**
@@ -166,7 +144,7 @@ export class SecureErrorHandler {
         severity: ErrorSeverity.MEDIUM,
         code: 'NULL_ERROR',
         timestamp: new Date(),
-        context: this.sanitizeContext(context),
+        context: this.sanitizer.sanitizeContext(context || {}, this.options.maxContextSize),
         originalError: undefined,
         shouldFailSafe: true
       };
@@ -177,7 +155,7 @@ export class SecureErrorHandler {
         severity: ErrorSeverity.MEDIUM,
         code: 'UNDEFINED_ERROR',
         timestamp: new Date(),
-        context: this.sanitizeContext(context),
+        context: this.sanitizer.sanitizeContext(context || {}, this.options.maxContextSize),
         originalError: undefined,
         shouldFailSafe: true
       };
@@ -187,11 +165,11 @@ export class SecureErrorHandler {
 
     // Sanitize message if enabled
     if (this.options.sanitizeMessages) {
-      message = this.sanitizeMessage(message);
+      message = this.sanitizer.sanitizeMessage(message);
     }
 
     // Sanitize and limit context size
-    const sanitizedContext = this.sanitizeContext(context);
+    const sanitizedContext = this.sanitizer.sanitizeContext(context || {}, this.options.maxContextSize);
 
     return {
       message,
@@ -340,10 +318,8 @@ export class SecureErrorHandler {
       }
     });
 
-    // Replace sensitive patterns
-    for (const pattern of this.sensitivePatterns) {
-      sanitized = sanitized.replace(pattern, '[REDACTED]');
-    }
+    // Use sanitizer for sensitive pattern replacement
+    sanitized = this.sanitizer.sanitizeMessage(sanitized);
 
     // Replace known error codes with user-friendly messages
     for (const [code, friendlyMessage] of this.errorMessages) {
@@ -417,7 +393,7 @@ export class SecureErrorHandler {
    */
   private sanitizeValue(value: any, visited = new WeakSet()): any {
     if (typeof value === 'string') {
-      return this.sanitizeMessage(value);
+      return this.sanitizer.sanitizeMessage(value);
     }
 
     if (typeof value === 'object' && value !== null) {

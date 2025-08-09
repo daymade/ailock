@@ -7,7 +7,6 @@ import { resolve } from 'path';
 import { lockCommand } from './commands/lock.js';
 import { unlockCommand } from './commands/unlock.js';
 import { statusCommand } from './commands/status.js';
-import { statusInteractiveCommand } from './commands/status-interactive.js';
 // Removed - duplicate functionality now in 'hooks' command
 import { preCommitCheckCommand } from './commands/pre-commit-check.js';
 import { initCommand } from './commands/init.js';
@@ -17,6 +16,9 @@ import { diagnoseCommand } from './commands/diagnose.js';
 import { completionCommand, setupCompletionCommand } from './commands/completion.js';
 import { completionHelperCommand } from './commands/completion-helper.js';
 import { hooksCommand } from './commands/hooks.js';
+import { createEditCommand } from './commands/edit.js';
+import { createEmergencyUnlockCommand } from './commands/emergency-unlock.js';
+import { createDoctorCommand } from './commands/doctor.js';
 
 const program = new Command();
 
@@ -47,10 +49,11 @@ function handleSmartRouting() {
   // If first argument exists and is not a known command, check if it's a path
   const firstArg = args[0];
   const knownCommands = [
-    'init', 'lock', 'unlock', 'status', 'status-interactive', 
-    'list', 'generate', 'hooks', 'diagnose', 'pre-commit-check',
+    'init', 'lock', 'unlock', 'edit', 'emergency-unlock', 'doctor',
+    'status', 'status-interactive', 'dash',
+    'list', 'ls', 'generate', 'gen', 'hooks', 'diagnose', 'pre-commit-check',
     'completion', 'setup-completion', 'completion-helper',
-    '--help', '-h', '--version', '-V'
+    '--help', '-h', '--version', '-V', 'help'
   ];
   
   if (!knownCommands.includes(firstArg) && !firstArg.startsWith('-')) {
@@ -97,11 +100,13 @@ program
 program.addCommand(initCommand);
 program.addCommand(lockCommand);
 program.addCommand(unlockCommand);
-program.addCommand(statusCommand);
-program.addCommand(statusInteractiveCommand);
+program.addCommand(createEditCommand()); // Smart unlock-edit-relock workflow
+program.addCommand(createEmergencyUnlockCommand()); // Emergency unlock for orphaned locks
+program.addCommand(statusCommand); // Includes interactive mode with --interactive
 program.addCommand(listCommand);
 program.addCommand(generateCommand);
 program.addCommand(hooksCommand); // Consolidated hook management
+program.addCommand(createDoctorCommand()); // Health check and auto-fix
 program.addCommand(diagnoseCommand);
 program.addCommand(completionCommand);
 program.addCommand(setupCompletionCommand);

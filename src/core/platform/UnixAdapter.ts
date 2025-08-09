@@ -1,6 +1,5 @@
 import { Platform } from '../platform.js';
 import { BasePlatformAdapter } from './BasePlatformAdapter.js';
-import { execSync } from 'child_process';
 import path from 'path';
 
 /**
@@ -152,10 +151,11 @@ export class UnixAdapter extends BasePlatformAdapter {
 
   /**
    * Check if a command exists on the system
+   * Made synchronous to maintain interface compatibility
    */
   private commandExists(command: string): boolean {
     try {
-      execSync(`which ${command}`, { stdio: 'ignore' });
+      require('child_process').execSync(`which ${command}`, { stdio: 'ignore' });
       return true;
     } catch {
       return false;

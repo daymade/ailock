@@ -2,8 +2,8 @@ import { existsSync } from 'fs';
 import { writeFile, mkdir, chmod, readFile } from 'fs/promises';
 import { homedir } from 'os';
 import path from 'path';
-import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { SecureCommandExecutor } from '../security/CommandExecutor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +53,11 @@ interface HookConfig {
 export class HooksService {
   private readonly SUPPORTED_TOOLS = ['claude'] as const;
   private readonly HOOK_TIMEOUT = 5000;
+  private readonly commandExecutor: SecureCommandExecutor;
+  
+  constructor() {
+    this.commandExecutor = new SecureCommandExecutor(['which', 'where']);
+  }
   
   /**
    * Detect Claude Code installation
@@ -97,7 +102,7 @@ export class HooksService {
    * Find ailock installation path
    * DRY - reused by both init and hooks commands
    */
-  public findAilockInstallation(): string {
+  public async findAilockInstallation(): Promise<string> {
     const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     
     // Check if we're in the ailock development directory
@@ -114,7 +119,13 @@ export class HooksService {
     
     // Check for global installation
     try {
-      execSync('which ailock 2>/dev/null || where ailock 2>NUL', { stdio: 'pipe' });
+      // Try Unix-style 'which' command first
+      if (process.platform !== 'win32') {
+        await this.commandExecutor.executeCommand('which', ['ailock']);
+      } else {
+        // Use Windows 'where' command
+        await this.commandExecutor.executeCommand('where', ['ailock']);
+      }
       return 'ailock';
     } catch {
       // Fallback to npx
