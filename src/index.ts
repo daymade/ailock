@@ -16,6 +16,7 @@ import { generateCommand } from './commands/generate.js';
 import { diagnoseCommand } from './commands/diagnose.js';
 import { completionCommand, setupCompletionCommand } from './commands/completion.js';
 import { completionHelperCommand } from './commands/completion-helper.js';
+import { hooksCommand } from './commands/hooks.js';
 
 const program = new Command();
 
@@ -37,7 +38,7 @@ function handleSmartRouting() {
   const knownCommands = [
     'init', 'lock', 'unlock', 'status', 'status-interactive', 
     'list', 'generate', 'install-hooks', 'diagnose', 'pre-commit-check',
-    'completion', 'setup-completion', 'completion-helper',
+    'completion', 'setup-completion', 'completion-helper', 'hooks',
     '--help', '-h', '--version', '-V'
   ];
   
@@ -90,6 +91,7 @@ program.addCommand(statusInteractiveCommand);
 program.addCommand(listCommand);
 program.addCommand(generateCommand);
 program.addCommand(installHooksCommand);
+program.addCommand(hooksCommand);
 program.addCommand(diagnoseCommand);
 program.addCommand(completionCommand);
 program.addCommand(setupCompletionCommand);

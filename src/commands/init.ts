@@ -8,6 +8,7 @@ import { InitWizard } from '../ui/components/InitWizard.js';
 import { isGitRepository, installPreCommitHook, getRepoRoot } from '../core/git.js';
 import { loadConfig, findProtectedFiles } from '../core/config.js';
 import { getPlatformAdapter } from '../core/platform.js';
+import { HooksService } from '../services/HooksService.js';
 import { homedir } from 'os';
 import path from 'path';
 
@@ -97,6 +98,9 @@ ${patterns.map(pattern => pattern.startsWith('!') ? pattern : pattern).join('\n'
 # Add your own patterns below:
 `;
 }
+
+// Initialize HooksService for DRY principle
+const hooksService = new HooksService();
 
 /**
  * Setup AI tool documentation (CLAUDE.md)
@@ -227,9 +231,39 @@ async function performCompleteSetup(options: any): Promise<void> {
     console.log(chalk.gray('   💡 Run: ailock lock (later)'));
   }
 
-  // Step 5: Setup AI documentation (if requested)
+  // Step 5: Claude Code Integration (if detected and not disabled)
+  let claudeHooksInstalled = false;
+  if (options.aiHooks !== false) {
+    console.log(chalk.cyan('\n🤖 Step 5: AI Tool Integration'));
+    const claudeInfo = hooksService.detectClaudeCode();
+    
+    if (claudeInfo.detected) {
+      try {
+        await hooksService.installClaudeHooks(claudeInfo);
+        claudeHooksInstalled = true;
+        console.log(chalk.green('   ✅ Installed Claude Code protection hooks'));
+        console.log(chalk.gray('   📍 Protected against accidental AI modifications'));
+        if (claudeInfo.isProjectLevel) {
+          console.log(chalk.gray('   📁 Project-level: .claude/settings.json'));
+        } else {
+          console.log(chalk.gray('   👤 User-level: ~/.claude/settings.json'));
+        }
+      } catch (error) {
+        console.log(chalk.yellow('   ⚠️  Claude Code hook installation failed'));
+        if (error instanceof Error) {
+          console.log(chalk.gray(`   💡 ${error.message}`));
+        }
+        console.log(chalk.gray('   💡 Run manually: ailock hooks install claude'));
+      }
+    } else {
+      console.log(chalk.gray('   ℹ️  Claude Code not detected - skipped'));
+      console.log(chalk.gray('   💡 Install hooks later: ailock hooks install claude'));
+    }
+  }
+
+  // Step 6: Setup AI documentation (if requested)
   if (options.withAiDocs) {
-    console.log(chalk.cyan('\n📖 Step 5: AI Tool Documentation'));
+    console.log(chalk.cyan(`\n📖 Step ${options.noAiHooks ? '5' : '6'}: AI Tool Documentation`));
     try {
       await setupAIDocumentation();
       console.log(chalk.green('   ✅ Created AI tool protection documentation'));
@@ -239,8 +273,9 @@ async function performCompleteSetup(options: any): Promise<void> {
     }
   }
 
-  // Step 6: Show status and next steps
-  console.log(chalk.cyan(`\n📊 Step ${options.withAiDocs ? '6' : '5'}: Project Status`));
+  // Step 7: Show status and next steps
+  const finalStep = options.withAiDocs ? (options.noAiHooks ? '6' : '7') : (options.noAiHooks ? '5' : '6');
+  console.log(chalk.cyan(`\n📊 Step ${finalStep}: Project Status`));
   console.log(chalk.green('🎉 Setup Complete! Your project is now AI-proof.'));
   
   console.log(chalk.blue.bold('\n💡 Quick Commands:'));
@@ -252,6 +287,9 @@ async function performCompleteSetup(options: any): Promise<void> {
   console.log(chalk.gray('   • Detected your project type and created .ailock config'));
   console.log(chalk.gray('   • Installed Git hooks to prevent accidental commits'));
   console.log(chalk.gray('   • Protected sensitive files with OS-level locks'));
+  if (claudeHooksInstalled) {
+    console.log(chalk.gray('   • Installed Claude Code hooks for AI protection'));
+  }
   console.log(chalk.gray('   • AI tools can read these files but cannot modify them'));
 }
 
@@ -261,6 +299,7 @@ export const initCommand = new Command('init')
   .option('--interactive', 'Use detailed interactive wizard for custom setup')
   .option('--config-only', 'Only create .ailock configuration file')
   .option('--with-ai-docs', 'Create AI tool documentation (CLAUDE.md) for enhanced protection')
+  .option('--no-ai-hooks', 'Skip automatic AI tool hook installation')
   .action(async (options) => {
     try {
       // Check if .ailock already exists

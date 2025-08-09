@@ -26,6 +26,7 @@ npx ailock lock .env
 # One command to protect your entire project
 ailock init
 ✅ Complete setup! Detected Node.js project, created config, installed hooks, protected 3 files
+✅ Claude Code hooks installed automatically (if detected)
 
 # That's it! Your project is now AI-proof
 # AI can still read sensitive files for context, but cannot modify them
@@ -347,6 +348,47 @@ ailock lock
 - **Clear error messages**: Helpful suggestions when operations fail
 - **Permission validation**: Warns about insufficient permissions
 - **Idempotent operations**: Safe to run lock/unlock multiple times
+
+## 🤖 Claude Code Integration
+
+AILock now includes **automatic Claude Code integration** that prevents accidental AI modifications of protected files.
+
+### Quick Setup
+
+```bash
+# Claude Code hooks are automatically installed during init!
+ailock init
+
+# That's it! Claude Code protection is now active
+```
+
+**Manual installation** (if needed):
+```bash
+# Run the interactive installer
+./node_modules/@code-is-cheap/ailock/hooks/install.sh
+```
+
+### How It Works
+
+The integration uses Claude Code's PreToolUse hooks to:
+- **Intercept** file modification attempts (Write, Edit, MultiEdit)
+- **Check** protection status via `ailock status`
+- **Block** modifications to locked files with clear feedback
+- **Allow** read operations for AI context understanding
+
+When Claude Code tries to modify a protected file, you'll see:
+```
+🔒 File is protected by ailock. Run 'ailock unlock config.json' to allow modifications.
+```
+
+### Benefits
+
+- ✅ **Zero-effort protection**: Works automatically once installed
+- ✅ **Clear feedback**: Know exactly why operations are blocked
+- ✅ **Maintains context**: AI can still read files for understanding
+- ✅ **Fail-safe**: Errors don't block Claude Code operations
+
+📚 **[Full Documentation →](docs/CLAUDE_CODE_INTEGRATION.md)**
 
 ## 🧪 Development
 
