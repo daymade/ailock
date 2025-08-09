@@ -4,9 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI Status](https://github.com/ai-proof/ailock/workflows/CI/badge.svg)](https://github.com/ai-proof/ailock/actions)
 
-**🔒 Enterprise-grade protection for sensitive files from accidental AI modifications**
+**🛡️ Protect your local configs from AI coding assistants' well-meaning modifications**
 
-AI-Proof File Guard (`ailock`) is a production-ready, cross-platform CLI tool that provides comprehensive "AI can read but not write" protection for sensitive files like `.env`, configuration files, secrets, and deployment scripts. With multi-layer security, interactive workflows, CI/CD integration, and enterprise features, ailock ensures your sensitive files remain safe while keeping them accessible for AI analysis and code assistance.
+AI-Proof File Guard (`ailock`) is a developer-friendly CLI tool that prevents AI coding assistants (Cursor, GitHub Copilot, Claude, etc.) from accidentally modifying your local configuration files. It provides "AI can read but not write" protection for files like `.env`, `docker-compose.yml`, `settings.json`, and other configs you don't want AI to touch. Keep all the benefits of AI assistance while protecting your local development environment.
 
 ## 🚀 Quick Start
 

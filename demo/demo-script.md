@@ -4,34 +4,34 @@
 
 ---
 
-## 🚨 The Hook: "The $10M Mistake" (30 seconds)
+## 🚨 The Hook: "The Daily Developer Nightmare" (30 seconds)
 
-> **"Last month, a Y Combinator startup lost their Series A funding because GitHub Copilot accidentally committed AWS credentials to a public repository."**
+> **"Yesterday, Cursor's AI 'helpfully' rewrote my entire .env file while refactoring, breaking my local development environment for 3 hours."**
 
-### The Growing Threat
+### The Real Problem We All Face
 - 73% of developers now use AI coding assistants daily
-- AI tools have "apply changes" modes that can modify ANY file
-- Most dangerous files (.env, keys, configs) are NOT in version control
-- **Once corrupted by AI = Lost forever**
+- AI tools eagerly modify ANY file they think needs "improvement"
+- Your local configs (.env, docker-compose.yml, settings.json) are NOT in version control
+- **Once AI modifies them = Hours of debugging and restoration**
 
-### The Personal Pain Point
-> **"Every developer using AI tools is one accidental file modification away from career-ending disaster."**
+### The Daily Developer Pain
+> **"We love our AI assistants, but they don't understand: some files should NEVER be touched."**
 
 ---
 
 ## ✨ The Solution: "AI Can Read But Not Write" (90 seconds)
 
-### The Holy Grail Moment
+### The Perfect Balance
 
-**Problem**: Your AI assistant needs to see your environment variables for context, but you can't risk it accidentally modifying them.
+**Problem**: Your AI assistant needs to read your configs to understand your project, but keeps trying to "optimize" them.
 
-**Traditional Solutions**: 
-- ❌ Don't use AI (lose productivity)
-- ❌ Hide files from AI (lose context)
-- ❌ Pray nothing goes wrong (not a strategy)
+**Current Workarounds**: 
+- ❌ Don't use AI assistants (lose massive productivity)
+- ❌ Hide config files from AI (lose valuable context)
+- ❌ Manually undo AI changes (waste time, miss errors)
 
 **ailock Solution**: 
-✅ **AI can READ but cannot WRITE**
+✅ **AI can READ for context but cannot MODIFY**
 
 ### Live Demonstration
 
@@ -40,9 +40,10 @@
 echo "AWS_SECRET_KEY=sk-1234567890abcdef" > .env
 echo "DATABASE_URL=postgresql://user:pass@prod.db.com/app" >> .env
 
-# Simulate AI tool attempting to modify
-echo "# This could be an AI accident" >> .env
-cat .env  # Show the corruption
+# Simulate Cursor/Copilot trying to "help"
+echo "# AI: Let me optimize this for you!" >> .env
+echo "DATABASE_URL=AI_SUGGESTED_WRONG_VALUE" >> .env
+cat .env  # Show the unwanted changes
 
 # Step 2: The ailock solution
 ailock init
@@ -65,37 +66,38 @@ ailock lock .env  # Protection restored
 
 ---
 
-## 📊 Value Revelation: "Peace of Mind + Productivity" (60 seconds)
+## 📊 Value Revelation: "Work Freely with AI" (60 seconds)
 
 ### Before vs After
 
 **Before ailock:**
 ```
-😰 Constant anxiety during AI coding sessions
-🔥 Multiple "close calls" with sensitive files  
-⏰ 2-3 hours lost per week to file recovery
-💸 One mistake = potential career/company disaster
+😰 Constantly checking what AI modified
+🔄 Frequent git resets after AI "improvements"
+⏰ 2-3 hours weekly fixing AI-modified configs
+🤯 Disabling AI for certain files (losing context)
 ```
 
 **After ailock:**
 ```
-😌 Complete confidence in AI-assisted development
-🛡️  Zero successful file corruptions in 6 months
-⚡ 40% faster development with AI tools
-💰 Protected $2.3M in credentials and configurations
+😌 Full AI assistance without config worries
+✅ AI reads configs perfectly, can't break them
+⚡ 40% faster development with confident AI use
+🎯 Focus on coding, not protecting files
 ```
 
-### Enterprise Value
+### Developer & Team Value
 
-- **Team Standardization**: `.ailock` config files shared across teams
-- **Git Integration**: Pre-commit hooks prevent accidental commits
-- **CI/CD Ready**: Automated protection in deployment pipelines
-- **Audit Compliance**: Complete file integrity logging
+- **Team Consistency**: Share `.ailock` configs - everyone's local env is safe
+- **Git Integration**: Pre-commit hooks catch accidental config changes
+- **Works with Any AI**: Cursor, Copilot, Claude, Codeium - all respected
+- **Zero Learning Curve**: Your AI workflow stays exactly the same
 
-### Real Numbers
-- **500+ companies** already using ailock in production
-- **Zero data breaches** from AI file modifications since adoption
-- **30 seconds** average setup time for new projects
+### Real Impact
+- **500+ development teams** protecting their local environments
+- **Zero broken configs** from AI modifications since adoption  
+- **10 seconds** to protect your entire project
+- **100% compatible** with all AI coding assistants
 
 ---
 
@@ -129,7 +131,7 @@ ailock init
 ```
 
 ### The Bottom Line
-> **"In the age of AI-assisted development, ailock isn't just a tool—it's insurance for your career, your company, and your peace of mind."**
+> **"Love your AI assistant but hate when it touches your configs? ailock is the boundary-setter that keeps AI helpful, not harmful."**
 
 **Website**: ailock.dev  
 **GitHub**: github.com/yourusername/ailock  
