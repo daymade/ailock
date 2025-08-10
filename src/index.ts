@@ -7,6 +7,8 @@ import { resolve } from 'path';
 import { lockCommand } from './commands/lock.js';
 import { unlockCommand } from './commands/unlock.js';
 import { statusCommand } from './commands/status.js';
+import { authCommand } from './commands/auth.js';
+import { quotaCommand } from './commands/quota.js';
 // Removed - duplicate functionality now in 'hooks' command
 import { preCommitCheckCommand } from './commands/pre-commit-check.js';
 import { initCommand } from './commands/init.js';
@@ -49,7 +51,7 @@ function handleSmartRouting() {
   // If first argument exists and is not a known command, check if it's a path
   const firstArg = args[0];
   const knownCommands = [
-    'init', 'lock', 'unlock', 'edit', 'emergency-unlock', 'doctor',
+    'init', 'lock', 'unlock', 'auth', 'quota', 'edit', 'emergency-unlock', 'doctor',
     'status', 'status-interactive', 'dash',
     'list', 'ls', 'generate', 'gen', 'hooks', 'diagnose', 'pre-commit-check',
     'completion', 'setup-completion', 'completion-helper',
@@ -100,6 +102,8 @@ program
 program.addCommand(initCommand);
 program.addCommand(lockCommand);
 program.addCommand(unlockCommand);
+program.addCommand(authCommand); // Auth code redemption for quota increase
+program.addCommand(quotaCommand); // Quota management and advanced features
 program.addCommand(createEditCommand()); // Smart unlock-edit-relock workflow
 program.addCommand(createEmergencyUnlockCommand()); // Emergency unlock for orphaned locks
 program.addCommand(statusCommand); // Includes interactive mode with --interactive

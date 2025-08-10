@@ -60,6 +60,7 @@
     "ink-text-input": "^6.0.0",
     "inquirer": "^12.8.2",
     "is-path-inside": "^4.0.0",
+    "node-fetch": "^3.3.2",
     "omelette": "^0.4.17",
     "path-type": "^6.0.0",
     "proper-lockfile": "^4.1.2",

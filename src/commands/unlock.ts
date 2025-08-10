@@ -21,7 +21,7 @@ export const unlockCommand = new Command('unlock')
         includeGitignored: !options.gitignore
       });
 
-      service.displaySummary('unlock', result, {
+      await service.displaySummary('unlock', result, {
         dryRun: options.dryRun,
         verbose: options.verbose
       });

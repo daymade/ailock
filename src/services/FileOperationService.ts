@@ -4,6 +4,14 @@ import { resolve } from 'path';
 import { loadConfig, findProtectedFiles } from '../core/config.js';
 import { getPlatformAdapter } from '../core/platform.js';
 import { info, success, warn, error } from '../utils/output.js';
+import { 
+  canLockFile, 
+  trackFileLocked, 
+  trackFileUnlocked, 
+  getQuotaUsage,
+  getQuotaStatusSummary 
+} from '../core/directory-tracker.js';
+import { getApiService } from './CliApiService.js';
 
 /**
  * Options for file operations
@@ -24,6 +32,7 @@ export interface FileOperationResult {
   successful: string[];
   failed: Array<{ file: string; error: string }>;
   skipped: string[];
+  quotaBlocked: string[];
   totalFiles: number;
 }
 
@@ -46,6 +55,7 @@ export class FileOperationService {
       successful: [],
       failed: [],
       skipped: [],
+      quotaBlocked: [],
       totalFiles: 0
     };
 
@@ -90,11 +100,35 @@ export class FileOperationService {
           continue;
         }
 
+        // Check quota before locking (only for lock operations)
+        if (operation === 'lock') {
+          const quotaCheck = await canLockFile(file);
+          
+          if (!quotaCheck.canLock) {
+            result.quotaBlocked.push(file);
+            if (options.verbose || result.quotaBlocked.length <= 3) {
+              warn(`  🚫 Quota exceeded for: ${file}`);
+            }
+            
+            // Track analytics for conversion trigger
+            if (result.quotaBlocked.length === 1) {
+              const apiService = getApiService();
+              await apiService.trackUsage('lock_attempt_blocked', {
+                directoryPath: file,
+                totalLockedCount: quotaCheck.quotaUsage.used
+              });
+            }
+            continue;
+          }
+        }
+
         // Perform the operation
         if (operation === 'lock') {
           await this.adapter.lockFile(file);
+          await trackFileLocked(file); // Track for quota management
         } else {
           await this.adapter.unlockFile(file);
+          await trackFileUnlocked(file); // Update quota tracking
         }
         
         result.successful.push(file);
@@ -181,7 +215,7 @@ export class FileOperationService {
   /**
    * Display operation summary
    */
-  public displaySummary(operation: 'lock' | 'unlock', result: FileOperationResult, options: FileOperationOptions): void {
+  public async displaySummary(operation: 'lock' | 'unlock', result: FileOperationResult, options: FileOperationOptions): Promise<void> {
     if (options.dryRun) {
       info(chalk.yellow(`\n🔍 Dry run completed. ${result.totalFiles} file(s) would be ${operation}ed.`));
       return;
@@ -197,6 +231,18 @@ export class FileOperationService {
     if (result.skipped.length > 0 && options.verbose) {
       const state = operation === 'lock' ? 'already locked' : 'already unlocked';
       info(chalk.gray(`ℹ️  Skipped ${result.skipped.length} file(s) (${state})`));
+    }
+
+    // Quota blocking summary (most important for conversion)
+    if (result.quotaBlocked.length > 0) {
+      error(`\n🚫 Quota exceeded: ${result.quotaBlocked.length} file(s) could not be locked`);
+      
+      // Show quota status
+      const quotaStatus = await getQuotaStatusSummary();
+      warn(`   Current quota: ${quotaStatus}`);
+      
+      // Show conversion message
+      this.displayConversionMessage(result.quotaBlocked.length);
     }
 
     // Failed summary with helpful suggestions
@@ -270,6 +316,35 @@ export class FileOperationService {
         info(chalk.blue('\n🎯 Quick fix for editing:'));
         info(chalk.gray('   ailock edit <file>  # Temporarily unlock, open editor, then relock'));
       }
+    }
+  }
+
+  /**
+   * Display conversion message when quota is exceeded
+   */
+  private displayConversionMessage(blockedCount: number): void {
+    // Main conversion trigger message (as per blueprint)
+    error(chalk.red('\n🚫 Free quota limit reached.'));
+    
+    info(chalk.yellow('\n✨ Unlock more capacity instantly!'));
+    info(chalk.white('   Visit https://ailock.dev to sign up and get 1 FREE auth code (+1 permanent capacity).'));
+    
+    info(chalk.green('\n💡 Growth hack:'));
+    info(chalk.white('   Use a friend\'s referral link to sign up and get 2 EXTRA auth codes!'));
+    info(chalk.gray('   (That\'s 4 total directories instead of 2)'));
+    
+    info(chalk.cyan('\n🔑 Already have an auth code?'));
+    info(chalk.white('   Run: ') + chalk.bold.cyan('ailock auth <your_auth_code>'));
+    
+    // Additional motivation for viral sharing
+    info(chalk.magenta('\n🎁 Bonus rewards:'));
+    info(chalk.gray('   • Invite friends = Both get 1 auth code when they activate'));
+    info(chalk.gray('   • Invite 3 friends = Get 5 BONUS auth codes!'));
+    info(chalk.gray('   • Every auth code = +1 permanent directory capacity'));
+    
+    if (blockedCount > 5) {
+      info(chalk.yellow(`\n📊 You tried to lock ${blockedCount} additional directories.`));
+      info(chalk.white('   Sign up now to unlock your full productivity potential!'));
     }
   }
 }

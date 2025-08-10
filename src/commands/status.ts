@@ -4,6 +4,8 @@ import path from 'path';
 import { render } from 'ink';
 import React from 'react';
 import { getRepoStatus, RepoStatus } from '../core/git.js';
+import { getQuotaUsage, getQuotaStatusSummary, initializeUserConfig } from '../core/directory-tracker.js';
+import { getApiService } from '../services/CliApiService.js';
 
 /**
  * Check if we're in an interactive terminal environment
@@ -15,11 +17,17 @@ function isInteractiveTerminal(): boolean {
 /**
  * Show simple status for scripts/CI environments
  */
-function showSimpleStatus(status: RepoStatus): void {
+async function showSimpleStatus(status: RepoStatus): Promise<void> {
   const totalProtected = status.protectedFiles.length;
   const totalLocked = status.lockedFiles.length;
   
-  console.log(`Protected: ${totalProtected}, Locked: ${totalLocked}, Git: ${status.isGitRepo ? 'Yes' : 'No'}, Hooks: ${status.hasAilockHook ? 'Yes' : 'No'}`);
+  // Get quota information
+  try {
+    const quotaUsage = await getQuotaUsage();
+    console.log(`Protected: ${totalProtected}, Locked: ${totalLocked}, Quota: ${quotaUsage.used}/${quotaUsage.quota}, Git: ${status.isGitRepo ? 'Yes' : 'No'}, Hooks: ${status.hasAilockHook ? 'Yes' : 'No'}`);
+  } catch {
+    console.log(`Protected: ${totalProtected}, Locked: ${totalLocked}, Git: ${status.isGitRepo ? 'Yes' : 'No'}, Hooks: ${status.hasAilockHook ? 'Yes' : 'No'}`);
+  }
   
   if (totalProtected > 0) {
     const currentDir = process.cwd();
@@ -34,9 +42,35 @@ function showSimpleStatus(status: RepoStatus): void {
 /**
  * Show detailed interactive status
  */
-function showDetailedStatus(status: RepoStatus): void {
+async function showDetailedStatus(status: RepoStatus): Promise<void> {
   // Header
   console.log(chalk.blue.bold('🔒 AI-Proof File Guard Status\n'));
+  
+  // Quota status (most important information first)
+  try {
+    const quotaUsage = await getQuotaUsage();
+    const quotaStatusSummary = await getQuotaStatusSummary();
+    
+    console.log(chalk.blue.bold('📊 Directory Quota Status'));
+    if (quotaUsage.withinQuota) {
+      console.log(chalk.green(`   ✅ ${quotaStatusSummary}`));
+    } else {
+      console.log(chalk.red(`   🚫 ${quotaStatusSummary}`));
+      console.log(chalk.yellow('   💡 Get auth codes to increase your quota'));
+    }
+    
+    if (quotaUsage.used > 0) {
+      console.log(chalk.gray(`   📁 Directories currently locked: ${quotaUsage.used}`));
+      if (quotaUsage.available > 0) {
+        console.log(chalk.gray(`   🔓 Additional directories available: ${quotaUsage.available}`));
+      }
+    }
+  } catch (error) {
+    console.log(chalk.yellow('📊 Directory Quota: Unable to load'));
+    console.log(chalk.gray('   💡 Run: ailock auth --help'));
+  }
+  
+  console.log(''); // Empty line
   
   // Git repository status
   if (status.isGitRepo) {
@@ -90,17 +124,41 @@ function showDetailedStatus(status: RepoStatus): void {
     }
   }
   
-  // Quick action suggestions
+  // Quick action suggestions with quota awareness
   console.log('\n' + chalk.blue.bold('🚀 Quick Actions:'));
-  if (unlockedCount > 0) {
-    console.log(chalk.yellow('   ailock lock                    # Lock all unprotected files'));
+  
+  try {
+    const quotaUsage = await getQuotaUsage();
+    
+    if (unlockedCount > 0) {
+      if (quotaUsage.withinQuota) {
+        console.log(chalk.yellow('   ailock lock                    # Lock all unprotected files'));
+      } else {
+        console.log(chalk.red('   ailock lock                    # Lock files (quota limit reached)'));
+        console.log(chalk.cyan('   ailock auth <code>             # Increase quota with auth code'));
+      }
+    }
+    
+    if (totalLocked > 0) {
+      console.log(chalk.gray('   ailock unlock [file]           # Unlock files for editing'));
+    }
+    
+    if (totalProtected === 0) {
+      console.log(chalk.cyan('   ailock lock --dry-run          # See what files would be protected'));
+    }
+    
+    if (!quotaUsage.withinQuota || quotaUsage.available <= 1) {
+      console.log(chalk.blue('   Visit ailock web portal        # Get more auth codes'));
+    }
+  } catch {
+    if (unlockedCount > 0) {
+      console.log(chalk.yellow('   ailock lock                    # Lock all unprotected files'));
+    }
+    if (totalLocked > 0) {
+      console.log(chalk.gray('   ailock unlock [file]           # Unlock files for editing'));
+    }
   }
-  if (totalLocked > 0) {
-    console.log(chalk.gray('   ailock unlock [file]           # Unlock files for editing'));
-  }
-  if (totalProtected === 0) {
-    console.log(chalk.cyan('   ailock lock --dry-run          # See what files would be protected'));
-  }
+  
   if (!status.hasAilockHook && status.isGitRepo) {
     console.log(chalk.yellow('   ailock install-hooks           # Install Git protection'));
   }
@@ -115,6 +173,13 @@ export const statusCommand = new Command('status')
   .option('--json', 'Output status as JSON')
   .action(async (options) => {
     try {
+      // Initialize user configuration if needed
+      await initializeUserConfig();
+      
+      // Track status check analytics
+      const apiService = getApiService();
+      await apiService.trackUsage('status_check');
+      
       // Handle interactive dashboard
       if (options.interactive) {
         const { StatusDashboard } = await import('../ui/components/StatusDashboard.js');
@@ -132,7 +197,17 @@ export const statusCommand = new Command('status')
       const status = await getRepoStatus();
       
       if (options.json) {
-        console.log(JSON.stringify(status, null, 2));
+        // Include quota information in JSON output
+        try {
+          const quotaUsage = await getQuotaUsage();
+          const statusWithQuota = {
+            ...status,
+            quota: quotaUsage
+          };
+          console.log(JSON.stringify(statusWithQuota, null, 2));
+        } catch {
+          console.log(JSON.stringify(status, null, 2));
+        }
         return;
       }
       
@@ -141,10 +216,10 @@ export const statusCommand = new Command('status')
       
       if (useDetailedOutput) {
         // Rich interactive output
-        showDetailedStatus(status);
+        await showDetailedStatus(status);
       } else {
         // Simple output for scripts/CI
-        showSimpleStatus(status);
+        await showSimpleStatus(status);
       }
       
     } catch (error) {

@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { FileOperationService } from '../services/FileOperationService.js';
+import { canLockFile, initializeUserConfig } from '../core/directory-tracker.js';
+import { getApiService } from '../services/CliApiService.js';
 
 export const lockCommand = new Command('lock')
   .description('Lock files to prevent accidental modifications')
@@ -11,6 +13,9 @@ export const lockCommand = new Command('lock')
   .option('--no-gitignore', 'Include files that are gitignored')
   .action(async (patterns: string[], options) => {
     try {
+      // Initialize user configuration if needed
+      await initializeUserConfig();
+      
       const service = new FileOperationService();
       
       const result = await service.processFiles('lock', {
@@ -21,7 +26,7 @@ export const lockCommand = new Command('lock')
         includeGitignored: !options.gitignore
       });
 
-      service.displaySummary('lock', result, {
+      await service.displaySummary('lock', result, {
         dryRun: options.dryRun,
         verbose: options.verbose
       });
