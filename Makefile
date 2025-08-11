@@ -266,8 +266,20 @@ push-tags: ## Push commits and tags to remote
 	git push $(GIT_REMOTE) $(MAIN_BRANCH) --follow-tags
 	@echo "$(GREEN)✓ Pushed commits and tags to $(GIT_REMOTE)$(RESET)"
 
+.PHONY: sync-version-to-web
+sync-version-to-web: ## Sync CLI version to web project
+	$(call print_header,Syncing version to web project)
+	@VERSION=$$(node -p "require('./package.json').version"); \
+	if [ -f "../ailock-web/src/config/cli-version.ts" ]; then \
+		sed -i.bak "s/version: '[^']*'/version: '$$VERSION'/" ../ailock-web/src/config/cli-version.ts && \
+		rm ../ailock-web/src/config/cli-version.ts.bak && \
+		echo "$(GREEN)✓ Synced version $$VERSION to web project$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠ Web project config not found at ../ailock-web/src/config/cli-version.ts$(RESET)"; \
+	fi
+
 .PHONY: publish-npm
-publish-npm: ## Publish package to npm
+publish-npm: sync-version-to-web ## Publish package to npm and sync version
 	$(call print_header,Publishing to npm)
 	npm publish --access public
 	@echo "$(GREEN)✓ Published $(PACKAGE_NAME)@$$(node -p "require('./package.json').version") to npm$(RESET)"

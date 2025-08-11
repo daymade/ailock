@@ -52,7 +52,7 @@ export class CliApiService {
     // Default to ailock-web production URL, can be overridden via environment
     this.baseUrl = options?.baseUrl || 
       process.env.AILOCK_API_URL || 
-      'https://ailock-web.supabase.co/functions/v1';
+      'https://woodccjkyacwceitkjby.supabase.co/functions/v1';
     this.timeout = options?.timeout || 10000; // 10 seconds
     this.maxRetries = options?.maxRetries || 3;
   }
