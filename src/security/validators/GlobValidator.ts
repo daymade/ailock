@@ -1,4 +1,4 @@
-import { glob } from 'glob';
+import glob from 'fast-glob';
 import path from 'path';
 import ignore from 'ignore';
 import { existsSync, readFileSync } from 'fs';
@@ -63,7 +63,7 @@ export class GlobValidator {
           absolute,
           dot: true,
           ignore: ignorePatterns,
-          nodir: true,
+          onlyFiles: true,
         });
         
         for (const match of matches) {
@@ -121,7 +121,7 @@ export class GlobValidator {
     
     for (const pattern of patterns) {
       // Simple pattern matching (can be enhanced with minimatch if needed)
-      if (pattern.includes('*')) {
+      if (pattern.includes('*') || pattern.includes('?')) {
         // Convert glob to regex (simplified)
         const regexPattern = pattern
           .replace(/\./g, '\\.')
