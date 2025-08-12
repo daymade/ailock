@@ -1,5 +1,5 @@
 import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import path from 'path';
 import glob from 'fast-glob';
 import { getRepoRoot } from './git.js';
@@ -83,7 +83,15 @@ export async function findGitignoreFile(startDir: string = process.cwd()): Promi
     
     const gitignorePath = path.join(repoRoot, '.gitignore');
     if (existsSync(gitignorePath)) {
-      return gitignorePath;
+      // Check if it's actually a file, not a directory
+      try {
+        const stats = statSync(gitignorePath);
+        if (stats.isFile()) {
+          return gitignorePath;
+        }
+      } catch {
+        // If we can't stat it, skip it
+      }
     }
     
     return null;
@@ -102,7 +110,15 @@ export async function findAilockFile(startDir: string = process.cwd()): Promise<
   while (currentDir !== root) {
     const ailockPath = path.join(currentDir, '.ailock');
     if (existsSync(ailockPath)) {
-      return ailockPath;
+      // Check if it's actually a file, not a directory
+      try {
+        const stats = statSync(ailockPath);
+        if (stats.isFile()) {
+          return ailockPath;
+        }
+      } catch {
+        // If we can't stat it, skip it
+      }
     }
     currentDir = path.dirname(currentDir);
   }
