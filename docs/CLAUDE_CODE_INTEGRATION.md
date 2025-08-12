@@ -186,7 +186,7 @@ If the hook reports "ailock command not found":
 
 1. **Global installation**:
 ```bash
-npm install -g @code-is-cheap/ailock
+npm install -g ailock
 ```
 
 2. **Local installation**:
@@ -284,7 +284,7 @@ async function checkCustomRules(filePath) {
 # .github/workflows/protect.yml
 - name: Setup AILock Protection
   run: |
-    npm install -g @code-is-cheap/ailock
+    npm install -g ailock
     ailock lock .env secrets/
     ./hooks/install.sh
 ```

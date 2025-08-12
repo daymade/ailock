@@ -129,7 +129,7 @@ export class HooksService {
       return 'ailock';
     } catch {
       // Fallback to npx
-      return 'npx @code-is-cheap/ailock';
+      return 'npx ailock';
     }
   }
 

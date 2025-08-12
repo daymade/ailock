@@ -157,7 +157,7 @@ async function checkAilockProtection(filePath) {
           ailockCmd = localAilock;
         } else {
           // Try npx as fallback
-          ailockCmd = 'npx @code-is-cheap/ailock';
+          ailockCmd = 'npx ailock';
         }
       }
       
@@ -184,7 +184,7 @@ async function checkAilockProtection(filePath) {
     
     // Check if it's a command not found error
     if (error.message && (error.message.includes('command not found') || error.message.includes('not recognized'))) {
-      console.error('AILock Hook: ailock command not found. Please install ailock globally: npm install -g @code-is-cheap/ailock');
+      console.error('AILock Hook: ailock command not found. Please install ailock globally: npm install -g ailock');
     }
     
     return false;

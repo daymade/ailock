@@ -365,7 +365,7 @@ ailock init
 **Manual installation** (if needed):
 ```bash
 # Run the interactive installer
-./node_modules/@code-is-cheap/ailock/hooks/install.sh
+./node_modules/ailock/hooks/install.sh
 ```
 
 ### How It Works

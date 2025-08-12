@@ -42,7 +42,7 @@ The web project uses a centralized version configuration in `src/config/cli-vers
 ```typescript
 export const CLI_CONFIG = {
   version: '1.5.1',
-  packageName: '@code-is-cheap/ailock',
+  packageName: 'ailock',
   // ... other configuration
 };
 ```
@@ -171,7 +171,7 @@ GET /cli-status?code={auth_code}
 
 2. **Version Mismatches**
    - Ensure global npm installation matches local version
-   - Update with: `npm install -g @code-is-cheap/ailock@latest`
+   - Update with: `npm install -g ailock@latest`
 
 3. **Authentication Failures**
    - Verify the auth code is valid and unused

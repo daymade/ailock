@@ -92,9 +92,9 @@ else
     print_error "ailock is not installed!"
     echo ""
     echo "Please install ailock first:"
-    echo "  npm install -g @code-is-cheap/ailock"
+    echo "  npm install -g ailock"
     echo "or"
-    echo "  npm install --save-dev @code-is-cheap/ailock"
+    echo "  npm install --save-dev ailock"
     exit 1
 fi
 
