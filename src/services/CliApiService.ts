@@ -43,6 +43,7 @@ export class CliApiService {
   private baseUrl: string;
   private timeout: number;
   private maxRetries: number;
+  private anonKey: string;
 
   constructor(options?: {
     baseUrl?: string;
@@ -55,6 +56,12 @@ export class CliApiService {
       'https://woodccjkyacwceitkjby.supabase.co/functions/v1';
     this.timeout = options?.timeout || 10000; // 10 seconds
     this.maxRetries = options?.maxRetries || 3;
+    // Supabase anon key for Edge Functions
+    // For development, the key can be provided via environment variable
+    // In production, the key is embedded during build process for user convenience
+    this.anonKey = process.env.AILOCK_ANON_KEY || 
+      // This is the public anon key - safe to expose as it's limited by RLS policies
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indvb2RjY2preWFjd2NlaXRramJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1ODU0NTQsImV4cCI6MjA3MDE2MTQ1NH0.34H_wio0aV0tdjBNTq9XUoxC2Qobmg-af2TW2n470O4';
   }
 
   /**
@@ -98,6 +105,7 @@ export class CliApiService {
           method: options.method,
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.anonKey}`,
             ...options.headers
           },
           body: options.body ? JSON.stringify(options.body) : undefined,
@@ -245,15 +253,21 @@ export class CliApiService {
     }
 
     try {
-      if (!authCode) {
-        return {
-          success: false,
-          error: 'Auth code required to check status'
-        };
+      // If auth code is provided, use it for full status
+      if (authCode) {
+        const response = await this.makeRequest(`cli-status?code=${encodeURIComponent(authCode)}`, {
+          method: 'GET'
+        });
+        return response as UserStatusResponse;
       }
-
-      const response = await this.makeRequest(`cli-status?code=${encodeURIComponent(authCode)}`, {
-        method: 'GET'
+      
+      // Otherwise, just get basic status with machine UUID
+      const machineUuid = await getMachineUuid();
+      const response = await this.makeRequest('cli-status', {
+        method: 'POST',
+        body: {
+          machine_uuid: machineUuid
+        }
       });
 
       return response as UserStatusResponse;
@@ -264,6 +278,13 @@ export class CliApiService {
         error: `Failed to get user status: ${error instanceof Error ? error.message : String(error)}`
       };
     }
+  }
+
+  /**
+   * Alias for getUserStatus - for backwards compatibility with tests
+   */
+  async checkStatus(authCode?: string): Promise<UserStatusResponse> {
+    return this.getUserStatus(authCode);
   }
 
   /**
