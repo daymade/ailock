@@ -118,7 +118,7 @@ async function main() {
 
   // Test 7: Track Usage Event
   await runTest('Track Usage Event', async () => {
-    const result = await apiService.trackUsage('test_integration', {
+    const result = await apiService.trackUsage('status_check', {
       test: true,
       timestamp: new Date().toISOString()
     });
