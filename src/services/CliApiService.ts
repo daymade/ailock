@@ -37,6 +37,47 @@ export type UsageEventType =
   | 'status_check';
 
 /**
+ * Rate limiter to prevent API abuse
+ */
+class RateLimiter {
+  private requests: number[] = [];
+  private readonly maxRequests: number;
+  private readonly windowMs: number;
+
+  constructor(maxRequests: number = 10, windowMs: number = 60000) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+  }
+
+  canMakeRequest(): boolean {
+    const now = Date.now();
+    // Remove old requests outside the window
+    this.requests = this.requests.filter(time => now - time < this.windowMs);
+    
+    if (this.requests.length >= this.maxRequests) {
+      return false;
+    }
+    
+    this.requests.push(now);
+    return true;
+  }
+
+  getTimeUntilNextRequest(): number {
+    if (this.requests.length === 0) return 0;
+    
+    const oldestRequest = this.requests[0];
+    const now = Date.now();
+    const timeElapsed = now - oldestRequest;
+    
+    if (timeElapsed >= this.windowMs) {
+      return 0;
+    }
+    
+    return this.windowMs - timeElapsed;
+  }
+}
+
+/**
  * CLI API service for integration with ailock-web growth system
  */
 export class CliApiService {
@@ -44,11 +85,13 @@ export class CliApiService {
   private timeout: number;
   private maxRetries: number;
   private anonKey: string;
+  private rateLimiter: RateLimiter;
 
   constructor(options?: {
     baseUrl?: string;
     timeout?: number;
     maxRetries?: number;
+    maxRequestsPerMinute?: number;
   }) {
     // Default to ailock-web production URL, can be overridden via environment
     this.baseUrl = options?.baseUrl || 
@@ -56,12 +99,27 @@ export class CliApiService {
       'https://woodccjkyacwceitkjby.supabase.co/functions/v1';
     this.timeout = options?.timeout || 10000; // 10 seconds
     this.maxRetries = options?.maxRetries || 3;
+    
+    // Initialize rate limiter (10 requests per minute by default)
+    const maxRequests = options?.maxRequestsPerMinute || 
+      parseInt(process.env.AILOCK_MAX_REQUESTS_PER_MINUTE || '10', 10);
+    this.rateLimiter = new RateLimiter(maxRequests, 60000);
+    
     // Supabase anon key for Edge Functions
-    // For development, the key can be provided via environment variable
-    // In production, the key is embedded during build process for user convenience
-    this.anonKey = process.env.AILOCK_ANON_KEY || 
-      // This is the public anon key - safe to expose as it's limited by RLS policies
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indvb2RjY2preWFjd2NlaXRramJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1ODU0NTQsImV4cCI6MjA3MDE2MTQ1NH0.34H_wio0aV0tdjBNTq9XUoxC2Qobmg-af2TW2n470O4';
+    // The anon key is public and safe to expose as it's limited by RLS policies
+    // Can be overridden via environment variable for different environments
+    const defaultAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indvb2RjY2preWFjd2NlaXRramJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1ODU0NTQsImV4cCI6MjA3MDE2MTQ1NH0.34H_wio0aV0tdjBNTq9XUoxC2Qobmg-af2TW2n470O4';
+    
+    // Use environment variable if available, otherwise use default
+    // This allows for easy configuration in different environments while maintaining
+    // a working default for end users who don't need to configure anything
+    this.anonKey = process.env.AILOCK_ANON_KEY || defaultAnonKey;
+    
+    // Log configuration source in debug mode
+    if (process.env.AILOCK_DEBUG === 'true') {
+      console.log(`Debug: Using ${process.env.AILOCK_ANON_KEY ? 'environment' : 'default'} API key configuration`);
+      console.log(`Debug: Rate limit set to ${maxRequests} requests per minute`);
+    }
   }
 
   /**
@@ -89,6 +147,13 @@ export class CliApiService {
       headers?: Record<string, string>;
     }
   ): Promise<any> {
+    // Check rate limit before making request
+    if (!this.rateLimiter.canMakeRequest()) {
+      const waitTime = this.rateLimiter.getTimeUntilNextRequest();
+      const waitSeconds = Math.ceil(waitTime / 1000);
+      throw new Error(`Rate limit exceeded. Please wait ${waitSeconds} seconds before making another request.`);
+    }
+
     const url = `${this.baseUrl}/${endpoint}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);

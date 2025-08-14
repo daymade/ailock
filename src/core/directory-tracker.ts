@@ -1,4 +1,4 @@
-import { resolve, dirname } from 'path';
+import { resolve, dirname, isAbsolute } from 'path';
 import { 
   loadUserConfig, 
   saveUserConfig, 
@@ -259,7 +259,7 @@ export async function validateDirectoryTracking(): Promise<string[]> {
         issues.push('Empty directory path found in tracking list');
       }
       
-      if (directory.includes('..') || !require('path').isAbsolute(directory)) {
+      if (directory.includes('..') || !isAbsolute(directory)) {
         issues.push(`Invalid directory path found: ${directory}`);
       }
     }
@@ -285,6 +285,7 @@ export async function repairDirectoryTracking(): Promise<{
   
   try {
     const config = await loadUserConfig();
+    const { existsSync } = await import('fs');
     let configChanged = false;
     
     // Remove duplicates
@@ -304,7 +305,7 @@ export async function repairDirectoryTracking(): Promise<{
         return false;
       }
       
-      if (directory.includes('..') || !require('path').isAbsolute(directory)) {
+      if (directory.includes('..') || !isAbsolute(directory)) {
         invalidPaths.push(directory);
         return false;
       }
@@ -314,6 +315,25 @@ export async function repairDirectoryTracking(): Promise<{
     
     if (invalidPaths.length > 0) {
       issuesFixed.push(`Removed ${invalidPaths.length} invalid directory path(s)`);
+      configChanged = true;
+      repaired = true;
+    }
+    
+    // Remove non-existent directories
+    const nonExistentPaths: string[] = [];
+    config.lockedDirectories = config.lockedDirectories.filter(directory => {
+      if (!existsSync(directory)) {
+        nonExistentPaths.push(directory);
+        return false;
+      }
+      return true;
+    });
+    
+    if (nonExistentPaths.length > 0) {
+      issuesFixed.push(`Removed ${nonExistentPaths.length} non-existent directory path(s)`);
+      if (process.env.AILOCK_DEBUG === 'true') {
+        console.log('Debug: Removed non-existent directories:', nonExistentPaths);
+      }
       configChanged = true;
       repaired = true;
     }

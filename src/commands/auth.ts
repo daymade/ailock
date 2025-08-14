@@ -1,20 +1,22 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { getApiService } from '../services/CliApiService.js';
+import { getApiService, type AuthRedeemResponse } from '../services/CliApiService.js';
 import { initializeUserConfig, getQuotaStatusSummary } from '../core/directory-tracker.js';
 import { info, success, error, warn } from '../utils/output.js';
 
 /**
  * Validate auth code format
+ * Requires secure 32-character format for proper security
  */
 function validateAuthCodeFormat(code: string): boolean {
-  return /^auth_[a-f0-9]{8}$/.test(code.trim());
+  // Secure format: auth_ + 32 hex characters
+  return /^auth_[a-f0-9]{32}$/.test(code.trim());
 }
 
 /**
  * Display auth code redemption success message
  */
-function displaySuccessMessage(response: any): void {
+function displaySuccessMessage(response: AuthRedeemResponse): void {
   success('🎉 Auth code redeemed successfully!');
   
   if (response.directory_quota) {
@@ -47,16 +49,14 @@ function displayFailureMessage(errorMessage: string): void {
     warn('   The auth code is invalid or has already been used.');
     info(chalk.gray('   • Check that you copied the code correctly'));
     info(chalk.gray('   • Auth codes can only be used once'));
-    info(chalk.gray('   • Get new codes from the ailock web portal'));
-  } else if (errorMessage.includes('network') || errorMessage.includes('connectivity')) {
-    warn('   Network connection failed.');
+  } else if (errorMessage.includes('offline')) {
+    warn('   Cannot redeem auth codes in offline mode.');
+    info(chalk.gray('   • Disable offline mode to redeem codes'));
+    info(chalk.gray('   • Run: ailock config set offline false'));
+  } else if (errorMessage.includes('network') || errorMessage.includes('timeout')) {
+    warn('   Network error occurred.');
     info(chalk.gray('   • Check your internet connection'));
-    info(chalk.gray('   • Try again in a moment'));
-    info(chalk.gray('   • Use --offline flag for local-only operation'));
-  } else if (errorMessage.includes('rate limit')) {
-    warn('   Rate limit exceeded.');
-    info(chalk.gray('   • Please wait a moment before trying again'));
-    info(chalk.gray('   • This prevents abuse of the system'));
+    info(chalk.gray('   • Try again in a few moments'));
   } else {
     warn(`   Error: ${errorMessage}`);
     info(chalk.gray('   • Try again in a few moments'));
@@ -71,7 +71,7 @@ function displayFailureMessage(errorMessage: string): void {
 
 export const authCommand = new Command('auth')
   .description('Redeem auth code to increase directory quota')
-  .argument('<code>', 'Auth code to redeem (format: auth_xxxxxxxx)')
+  .argument('<code>', 'Auth code to redeem (format: auth_ + 32 hex characters)')
   .option('-v, --verbose', 'Show detailed output')
   .option('--dry-run', 'Validate auth code format without redeeming')
   .action(async (code: string, options) => {
@@ -84,11 +84,11 @@ export const authCommand = new Command('auth')
       
       if (!validateAuthCodeFormat(cleanCode)) {
         error('❌ Invalid auth code format');
-        warn('   Auth codes should be in the format: auth_xxxxxxxx');
-        warn('   Where x is a lowercase letter or number');
-        info(chalk.gray('\n💡 Example: auth_a1b2c3d4'));
-        info(chalk.gray('   Get valid codes from the ailock web portal'));
-        process.exit(1);
+        warn('   Auth codes must be 32 hex characters after auth_ prefix');
+        info(chalk.gray('\n💡 Example:'));
+        info(chalk.gray('   auth_a1b2c3d4e5f6789012345678901234567890'));
+        info(chalk.gray('\n   Get valid codes from the ailock web portal'));
+        throw new Error('Invalid auth code format');
       }
 
       if (options.dryRun) {
@@ -98,48 +98,60 @@ export const authCommand = new Command('auth')
         return;
       }
 
-      // Show current status before redemption
+      // Show current status before redemption if verbose
       if (options.verbose) {
-        info(chalk.blue('📊 Current status:'));
-        const currentStatus = await getQuotaStatusSummary();
-        info(chalk.gray(`   ${currentStatus}`));
-        info(''); // Empty line
+        const statusBefore = await getQuotaStatusSummary();
+        info(chalk.blue('\n📊 Current Status:'));
+        info(chalk.gray(`   ${statusBefore}`));
       }
 
-      // Attempt to redeem the auth code
-      info(chalk.cyan('🔄 Redeeming auth code...'));
-      
+      // Redeem the auth code
+      info(chalk.blue('\n🔄 Redeeming auth code...'));
       const apiService = getApiService();
       const response = await apiService.redeemAuthCode(cleanCode);
 
       if (response.success) {
         displaySuccessMessage(response);
         
-        // Note: Auth code redemption is already tracked by the web API
-        // No additional analytics tracking needed here
-        
-        // Show updated status
+        // Show new status if verbose
         if (options.verbose) {
-          info(chalk.blue('\n📊 Updated status:'));
-          const updatedStatus = await getQuotaStatusSummary();
-          info(chalk.gray(`   ${updatedStatus}`));
+          const statusAfter = await getQuotaStatusSummary();
+          info(chalk.blue('\n📊 Updated Status:'));
+          info(chalk.gray(`   ${statusAfter}`));
         }
-        
       } else {
         displayFailureMessage(response.error || 'Unknown error occurred');
-        process.exit(1);
+        throw new Error(response.error || 'Unknown error occurred');
       }
-
     } catch (err) {
+      // Re-throw if it's an expected error that was already handled with proper messaging
+      if (err instanceof Error && (
+        err.message === 'Invalid auth code format' || 
+        err.message.includes('Unknown error occurred') ||
+        err.message.includes('Failed to redeem auth code')
+      )) {
+        throw err;
+      }
+      
+      // Handle unexpected errors
       error('❌ Unexpected error during auth code redemption');
-      console.error(chalk.red('Details:'), err instanceof Error ? err.message : String(err));
       
-      info(chalk.blue('\n💡 Troubleshooting:'));
-      info(chalk.gray('   • Check your internet connection'));
-      info(chalk.gray('   • Verify the auth code is correct'));
-      info(chalk.gray('   • Try again in a few moments'));
-      info(chalk.gray('   • Use ailock status to check current quota'));
+      if (err instanceof Error) {
+        warn(`   ${err.message}`);
+        
+        if (process.env.AILOCK_DEBUG === 'true') {
+          // Sanitize error output to prevent information disclosure
+          const sanitizedError = {
+            message: err.message,
+            name: err.name,
+            // Don't expose full stack trace, just the first line
+            stack: err.stack?.split('\n')[0]
+          };
+          console.error('Debug: Error details:', sanitizedError);
+        }
+      }
       
-      process.exit(1);
+      info(chalk.gray('\n💡 Try again or contact support if the issue persists'));
+      throw err;
     }
   });
