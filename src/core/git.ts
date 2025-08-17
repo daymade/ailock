@@ -4,6 +4,7 @@ import { mkdir } from 'fs/promises';
 import path from 'path';
 import { loadConfig, findProtectedFiles } from './config.js';
 import { getPlatformAdapter } from './platform.js';
+import { gitRepoCache } from './git-cache.js';
 
 export interface GitHookInfo {
   hookPath: string;
@@ -44,11 +45,26 @@ export async function isGitRepository(cwd?: string): Promise<boolean> {
  * Get the Git repository root directory
  */
 export async function getRepoRoot(cwd?: string): Promise<string | null> {
+  const checkPath = cwd || process.cwd();
+  
+  // Check cache first
+  const cached = gitRepoCache.get(checkPath);
+  if (cached !== undefined) {
+    return cached;
+  }
+  
+  // Perform actual Git detection
   try {
     const git = getGit(cwd);
     const repoRoot = await git.revparse(['--show-toplevel']);
-    return repoRoot.trim();
+    const result = repoRoot.trim();
+    
+    // Cache the result
+    gitRepoCache.set(checkPath, result);
+    return result;
   } catch {
+    // Cache negative result too
+    gitRepoCache.set(checkPath, null);
     return null;
   }
 }

@@ -8,6 +8,30 @@ import {
 import { writeFile, readFile, unlink, stat } from 'fs/promises';
 import path from 'path';
 
+// Mock proper-lockfile to prevent actual file system locks
+vi.mock('proper-lockfile', () => ({
+  lock: vi.fn().mockResolvedValue(undefined),
+  unlock: vi.fn().mockResolvedValue(undefined),
+  check: vi.fn().mockImplementation((filePath: string) => {
+    // Simple state tracking for testing
+    const lockfilePath = `${filePath}.lock`;
+    try {
+      require('fs').accessSync(lockfilePath);
+      return true;
+    } catch {
+      return false;
+    }
+  })
+}));
+
+// Mock write-file-atomic
+vi.mock('write-file-atomic', () => ({
+  default: vi.fn().mockImplementation(async (path: string, data: string | Buffer) => {
+    const fs = await import('fs/promises');
+    return fs.writeFile(path, data);
+  })
+}));
+
 describe('Atomic File Operations and Race Condition Prevention', () => {
   let manager: AtomicFileManager;
   let testEnv: SecurityTestEnvironment;

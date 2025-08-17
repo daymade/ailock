@@ -20,19 +20,24 @@ import * as platformModule from '../../src/core/platform.js';
 
 const execAsync = promisify(exec);
 
-// Mock simple-git
-vi.mock('simple-git', () => ({
-  simpleGit: vi.fn(() => ({
+// Mock simple-git with proper factory function
+vi.mock('simple-git', () => {
+  const mockGitInstance = {
     checkIsRepo: vi.fn(),
     revparse: vi.fn(),
     status: vi.fn()
-  })),
-  CheckRepoActions: {
-    IS_REPO_ROOT: true
-  }
-}));
+  };
+  
+  return {
+    default: vi.fn(() => mockGitInstance),
+    simpleGit: vi.fn(() => mockGitInstance),
+    CheckRepoActions: {
+      IS_REPO_ROOT: true
+    }
+  };
+});
 
-// Mock config and platform modules partially
+// Mock config and platform modules
 vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn(),
   findProtectedFiles: vi.fn()
@@ -52,14 +57,16 @@ describe('Git Module Tests', () => {
       // Reset all mocks
       vi.clearAllMocks();
       
-      // Get the mocked simple-git instance
-      const simpleGit = vi.mocked(await import('simple-git')).simpleGit;
+      // Access the mocked simple-git instance directly
+      const { simpleGit } = await import('simple-git');
       mockGit = {
         checkIsRepo: vi.fn(),
         revparse: vi.fn(),
         status: vi.fn()
       };
-      simpleGit.mockReturnValue(mockGit);
+      
+      // Cast and configure the mock
+      (simpleGit as any).mockReturnValue(mockGit);
     });
 
     describe('isGitRepository', () => {
@@ -85,7 +92,7 @@ describe('Git Module Tests', () => {
         
         await isGitRepository();
         
-        const simpleGit = vi.mocked(await import('simple-git')).simpleGit;
+        const { simpleGit } = await import('simple-git');
         expect(simpleGit).toHaveBeenCalledWith(process.cwd());
       });
     });
@@ -124,8 +131,10 @@ describe('Git Module Tests', () => {
           '/workspace/other.txt'
         ];
         
+        // Mock process.cwd() instead of actually changing directories
         const originalCwd = process.cwd();
-        process.chdir('/workspace');
+        const mockCwd = '/workspace';
+        vi.spyOn(process, 'cwd').mockReturnValue(mockCwd);
         
         try {
           const result = await hasStagedChanges(files);
@@ -134,7 +143,7 @@ describe('Git Module Tests', () => {
           expect(result).toContain('/workspace/src/file2.js');
           expect(result).not.toContain('/workspace/other.txt');
         } finally {
-          process.chdir(originalCwd);
+          vi.restoreAll();
         }
       });
 
@@ -147,14 +156,13 @@ describe('Git Module Tests', () => {
         });
         
         const files = ['/workspace/config.json'];
-        const originalCwd = process.cwd();
-        process.chdir('/workspace');
+        vi.spyOn(process, 'cwd').mockReturnValue('/workspace');
         
         try {
           const result = await hasStagedChanges(files);
           expect(result).toContain('/workspace/config.json');
         } finally {
-          process.chdir(originalCwd);
+          vi.restoreAll();
         }
       });
 
@@ -167,14 +175,13 @@ describe('Git Module Tests', () => {
         });
         
         const files = ['/workspace/new.txt'];
-        const originalCwd = process.cwd();
-        process.chdir('/workspace');
+        vi.spyOn(process, 'cwd').mockReturnValue('/workspace');
         
         try {
           const result = await hasStagedChanges(files);
           expect(result).toContain('/workspace/new.txt');
         } finally {
-          process.chdir(originalCwd);
+          vi.restoreAll();
         }
       });
 
@@ -206,12 +213,15 @@ describe('Git Module Tests', () => {
         mockGit.revparse.mockResolvedValue('/repo/root\n');
         
         // Mock config
-        vi.mocked(configModule.loadConfig).mockResolvedValue({
+        const loadConfigMock = vi.mocked(configModule.loadConfig);
+        const findProtectedFilesMock = vi.mocked(configModule.findProtectedFiles);
+        
+        loadConfigMock.mockResolvedValue({
           patterns: ['.env', '*.key'],
           useGitignore: true,
           configPath: '.ailock'
         });
-        vi.mocked(configModule.findProtectedFiles).mockResolvedValue([
+        findProtectedFilesMock.mockResolvedValue([
           '/repo/root/.env',
           '/repo/root/secret.key'
         ]);
@@ -222,7 +232,8 @@ describe('Git Module Tests', () => {
             .mockResolvedValueOnce(true)  // .env is locked
             .mockResolvedValueOnce(false) // secret.key is not locked
         };
-        vi.mocked(platformModule.getPlatformAdapter).mockReturnValue(mockAdapter as any);
+        const getPlatformAdapterMock = vi.mocked(platformModule.getPlatformAdapter);
+        getPlatformAdapterMock.mockReturnValue(mockAdapter as any);
         
         // Mock getHookInfo
         const getHookInfoSpy = vi.spyOn(await import('../../src/core/git.js'), 'getHookInfo');
@@ -249,13 +260,15 @@ describe('Git Module Tests', () => {
         mockGit.checkIsRepo.mockResolvedValue(true);
         mockGit.revparse.mockResolvedValue('/repo/root\n');
         
-        vi.mocked(configModule.findProtectedFiles).mockResolvedValue(['/repo/root/.env']);
+        const findProtectedFilesMock = vi.mocked(configModule.findProtectedFiles);
+        findProtectedFilesMock.mockResolvedValue(['/repo/root/.env']);
         
         // Mock adapter to throw error
         const mockAdapter = {
           isLocked: vi.fn().mockRejectedValue(new Error('Permission denied'))
         };
-        vi.mocked(platformModule.getPlatformAdapter).mockReturnValue(mockAdapter as any);
+        const getPlatformAdapterMock = vi.mocked(platformModule.getPlatformAdapter);
+        getPlatformAdapterMock.mockReturnValue(mockAdapter as any);
         
         const result = await getRepoStatus('/repo/root');
         
@@ -510,8 +523,8 @@ describe('Git Module Tests', () => {
         checkIsRepo: vi.fn().mockRejectedValue(new Error('git: command not found'))
       };
       
-      const simpleGit = vi.mocked(await import('simple-git')).simpleGit;
-      simpleGit.mockReturnValue(mockGit as any);
+      const { simpleGit } = await import('simple-git');
+      (simpleGit as any).mockReturnValue(mockGit);
       
       const result = await isGitRepository();
       expect(result).toBe(false);

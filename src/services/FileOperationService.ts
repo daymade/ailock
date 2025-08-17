@@ -6,10 +6,15 @@ import { getPlatformAdapter } from '../core/platform.js';
 import { info, success, warn, error } from '../utils/output.js';
 import { 
   canLockFile, 
+  canLockProject,
   trackFileLocked, 
-  trackFileUnlocked, 
+  trackFileUnlocked,
+  trackProjectFileLocked,
+  trackProjectFileUnlocked,
   getQuotaUsage,
-  getQuotaStatusSummary 
+  getQuotaStatusSummary,
+  getProjectQuotaUsage,
+  getProjectQuotaStatusSummary
 } from '../core/directory-tracker.js';
 import { getApiService } from './CliApiService.js';
 
@@ -102,7 +107,7 @@ export class FileOperationService {
 
         // Check quota before locking (only for lock operations)
         if (operation === 'lock') {
-          const quotaCheck = await canLockFile(file);
+          const quotaCheck = await canLockProject(file);
           
           if (!quotaCheck.canLock) {
             result.quotaBlocked.push(file);
@@ -113,9 +118,14 @@ export class FileOperationService {
             // Track analytics for conversion trigger
             if (result.quotaBlocked.length === 1) {
               const apiService = getApiService();
-              await apiService.trackUsage('lock_attempt_blocked', {
+              await apiService.trackUsage('project_quota_exceeded', {
                 directoryPath: file,
-                totalLockedCount: quotaCheck.quotaUsage.used
+                totalLockedCount: quotaCheck.quotaUsage.used,
+                metadata: {
+                  quotaType: 'project',
+                  quotaLimit: quotaCheck.quotaUsage.quota,
+                  quotaUsed: quotaCheck.quotaUsage.used
+                }
               });
             }
             continue;
@@ -125,10 +135,10 @@ export class FileOperationService {
         // Perform the operation
         if (operation === 'lock') {
           await this.adapter.lockFile(file);
-          await trackFileLocked(file); // Track for quota management
+          await trackProjectFileLocked(file); // Track for project-based quota management
         } else {
           await this.adapter.unlockFile(file);
-          await trackFileUnlocked(file); // Update quota tracking
+          await trackProjectFileUnlocked(file); // Update project-based quota tracking
         }
         
         result.successful.push(file);
@@ -237,8 +247,8 @@ export class FileOperationService {
     if (result.quotaBlocked.length > 0) {
       error(`\n🚫 Quota exceeded: ${result.quotaBlocked.length} file(s) could not be locked`);
       
-      // Show quota status
-      const quotaStatus = await getQuotaStatusSummary();
+      // Show project quota status
+      const quotaStatus = await getProjectQuotaStatusSummary();
       warn(`   Current quota: ${quotaStatus}`);
       
       // Show conversion message

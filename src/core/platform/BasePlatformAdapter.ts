@@ -11,15 +11,16 @@ import type { PlatformAdapter, SecurityInfo, Platform } from '../platform.js';
 export abstract class BasePlatformAdapter implements PlatformAdapter {
   protected commandExecutor: SecureCommandExecutor;
   protected pathValidator: SecurePathValidator;
-  protected fileManager: AtomicFileManager;
+  protected fileManager?: AtomicFileManager;
   protected errorHandler: SecureErrorHandler;
   protected abstract platformType: Platform;
 
   constructor() {
     this.commandExecutor = new SecureCommandExecutor();
     this.pathValidator = new SecurePathValidator();
-    this.fileManager = new AtomicFileManager();
     this.errorHandler = new SecureErrorHandler();
+    // Remove circular dependency - AtomicFileManager should not be created here
+    // This will be injected or created when needed to avoid circular references
   }
 
   /**

@@ -26,7 +26,7 @@ export interface AtomicOperationOptions {
  */
 export class AtomicFileManager {
   private readonly lockDir = '.ailock-locks';
-  private readonly defaultTimeout = 5000; // 5 seconds (shorter for better test performance)
+  private readonly defaultTimeout = process.env.NODE_ENV === 'test' ? 1000 : 5000; // 1 second for tests, 5 seconds for production
   private readonly activeLocks = new Map<string, string>(); // filePath -> lockId
   private readonly lockCleanupTimers = new Map<string, NodeJS.Timeout>();
 

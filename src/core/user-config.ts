@@ -4,13 +4,36 @@ import { join } from 'path';
 import { getAilockConfigDir, getMachineFingerprint, isValidMachineUuid, sanitizeForLogging } from './machine-id.js';
 
 /**
+ * Project unit types for the new quota system
+ */
+export type ProjectType = 'git' | 'directory';
+
+/**
+ * A protected project unit (Git repository or standalone directory)
+ */
+export interface ProjectUnit {
+  id: string;              // Unique identifier for the project
+  rootPath: string;        // Absolute path to project root
+  type: ProjectType;       // Git repository or standalone directory
+  name: string;            // Display name for the project
+  protectedPaths: string[]; // Files/directories protected within this project
+  createdAt: Date;         // When this project was first protected
+  lastAccessedAt?: Date;   // Last time files in this project were accessed
+}
+
+/**
  * User configuration interface for growth system integration
  */
 export interface UserConfig {
   machineUuid: string;
   authToken?: string;
-  directoryQuota: number;
-  lockedDirectories: string[];
+  // New project-based quota system
+  projectQuota: number;          // Number of projects user can protect
+  protectedProjects: ProjectUnit[]; // List of protected projects
+  // Legacy fields (for migration compatibility)
+  directoryQuota?: number;       // Legacy: will be migrated to projectQuota
+  lockedDirectories?: string[];  // Legacy: will be migrated to protectedProjects
+  // Other settings
   lastSyncAt?: Date;
   apiEndpoint?: string;
   offlineMode?: boolean;
@@ -19,6 +42,7 @@ export interface UserConfig {
   machineFingerprint?: string; // Security validation
   privacyLevel?: 'minimal' | 'standard' | 'enhanced'; // Privacy controls
   telemetryOptOut?: boolean; // Opt-out from telemetry
+  hasAcceptedPrivacyPolicy?: boolean; // First-run privacy consent
 }
 
 /**
@@ -26,13 +50,17 @@ export interface UserConfig {
  */
 export const DEFAULT_USER_CONFIG: UserConfig = {
   machineUuid: '',
-  directoryQuota: 2, // Default free tier: 2 directories
+  projectQuota: 2, // Default free tier: 2 projects
+  protectedProjects: [],
+  // Legacy compatibility
+  directoryQuota: 2, 
   lockedDirectories: [],
   analyticsEnabled: true,
   offlineMode: false,
-  version: '1.0.0',
+  version: '2.0.0', // Bumped for project-based quota system
   privacyLevel: 'standard',
-  telemetryOptOut: false
+  telemetryOptOut: false,
+  hasAcceptedPrivacyPolicy: false
 };
 
 /**
@@ -67,6 +95,25 @@ export async function loadUserConfig(): Promise<UserConfig> {
       // Convert date strings back to Date objects
       if (config.lastSyncAt && typeof config.lastSyncAt === 'string') {
         mergedConfig.lastSyncAt = new Date(config.lastSyncAt);
+      }
+
+      // Handle migration from old directory-based to project-based quota system
+      const needsMigration = !config.protectedProjects || config.protectedProjects.length === 0;
+      const hasLegacyData = config.lockedDirectories && config.lockedDirectories.length > 0;
+      
+      if (needsMigration && hasLegacyData) {
+        await migrateLegacyDirectoriesToProjects(mergedConfig);
+      }
+
+      // Handle date conversion for projects
+      if (mergedConfig.protectedProjects) {
+        mergedConfig.protectedProjects = mergedConfig.protectedProjects.map(project => ({
+          ...project,
+          createdAt: typeof project.createdAt === 'string' ? new Date(project.createdAt) : project.createdAt,
+          lastAccessedAt: project.lastAccessedAt && typeof project.lastAccessedAt === 'string' 
+            ? new Date(project.lastAccessedAt) 
+            : project.lastAccessedAt
+        }));
       }
 
       return mergedConfig;
@@ -104,23 +151,47 @@ export async function saveUserConfig(config: UserConfig): Promise<void> {
 }
 
 /**
- * Get current user's directory quota
+ * Get current user's directory quota (legacy compatibility)
  */
 export async function getUserQuota(): Promise<number> {
   const config = await loadUserConfig();
-  return config.directoryQuota;
+  return config.directoryQuota ?? config.projectQuota;
 }
 
 /**
- * Get locked directories count
+ * Get current user's project quota
+ */
+export async function getProjectQuota(): Promise<number> {
+  const config = await loadUserConfig();
+  return config.projectQuota;
+}
+
+/**
+ * Get locked directories count (legacy compatibility)
  */
 export async function getLockedDirectoryCount(): Promise<number> {
   const config = await loadUserConfig();
-  return config.lockedDirectories.length;
+  return (config.lockedDirectories?.length ?? 0) || config.protectedProjects.length;
 }
 
 /**
- * Check if user is within their directory quota
+ * Get protected projects count
+ */
+export async function getProtectedProjectCount(): Promise<number> {
+  const config = await loadUserConfig();
+  return config.protectedProjects.length;
+}
+
+/**
+ * Get all protected projects
+ */
+export async function getProtectedProjects(): Promise<ProjectUnit[]> {
+  const config = await loadUserConfig();
+  return [...config.protectedProjects]; // Return copy to prevent mutation
+}
+
+/**
+ * Check if user is within their directory quota (legacy compatibility)
  */
 export async function isWithinQuota(): Promise<boolean> {
   const [quota, lockedCount] = await Promise.all([
@@ -132,12 +203,27 @@ export async function isWithinQuota(): Promise<boolean> {
 }
 
 /**
+ * Check if user is within their project quota
+ */
+export async function isWithinProjectQuota(): Promise<boolean> {
+  const [quota, projectCount] = await Promise.all([
+    getProjectQuota(),
+    getProtectedProjectCount()
+  ]);
+  
+  return projectCount < quota;
+}
+
+/**
  * Add a directory to the locked directories list
  */
 export async function addLockedDirectory(dirPath: string): Promise<void> {
   const config = await loadUserConfig();
   
-  // Add directory if not already in list
+  // Add directory if not already in list (legacy compatibility)
+  if (!config.lockedDirectories) {
+    config.lockedDirectories = [];
+  }
   if (!config.lockedDirectories.includes(dirPath)) {
     config.lockedDirectories.push(dirPath);
     await saveUserConfig(config);
@@ -151,18 +237,83 @@ export async function removeLockedDirectory(dirPath: string): Promise<void> {
   const config = await loadUserConfig();
   
   // Remove directory from list
-  config.lockedDirectories = config.lockedDirectories.filter(dir => dir !== dirPath);
+  if (config.lockedDirectories) {
+    config.lockedDirectories = config.lockedDirectories.filter(dir => dir !== dirPath);
+  }
   await saveUserConfig(config);
 }
 
 /**
- * Update user's directory quota (typically after auth code redemption)
+ * Update user's directory quota (legacy compatibility)
  */
 export async function updateDirectoryQuota(newQuota: number): Promise<void> {
   const config = await loadUserConfig();
-  config.directoryQuota = Math.max(0, newQuota); // Ensure non-negative
+  const validQuota = Math.max(0, newQuota); // Ensure non-negative
+  config.directoryQuota = validQuota;
+  config.projectQuota = validQuota; // Also update project quota
   config.lastSyncAt = new Date();
   await saveUserConfig(config);
+}
+
+/**
+ * Update user's project quota (typically after auth code redemption)
+ */
+export async function updateProjectQuota(newQuota: number): Promise<void> {
+  const config = await loadUserConfig();
+  const validQuota = Math.max(0, newQuota); // Ensure non-negative
+  config.projectQuota = validQuota;
+  config.directoryQuota = validQuota; // Keep legacy in sync
+  config.lastSyncAt = new Date();
+  await saveUserConfig(config);
+}
+
+/**
+ * Add a protected project
+ */
+export async function addProtectedProject(project: ProjectUnit): Promise<void> {
+  const config = await loadUserConfig();
+  
+  // Check if project already exists (by rootPath)
+  const existingIndex = config.protectedProjects.findIndex(p => p.rootPath === project.rootPath);
+  if (existingIndex >= 0) {
+    // Update existing project
+    config.protectedProjects[existingIndex] = { ...project };
+  } else {
+    // Add new project
+    config.protectedProjects.push(project);
+  }
+  
+  await saveUserConfig(config);
+}
+
+/**
+ * Remove a protected project by root path
+ */
+export async function removeProtectedProject(rootPath: string): Promise<void> {
+  const config = await loadUserConfig();
+  config.protectedProjects = config.protectedProjects.filter(p => p.rootPath !== rootPath);
+  await saveUserConfig(config);
+}
+
+/**
+ * Find a protected project by root path
+ */
+export async function findProtectedProject(rootPath: string): Promise<ProjectUnit | null> {
+  const config = await loadUserConfig();
+  return config.protectedProjects.find(p => p.rootPath === rootPath) || null;
+}
+
+/**
+ * Update protected paths for a project
+ */
+export async function updateProjectProtectedPaths(rootPath: string, protectedPaths: string[]): Promise<void> {
+  const config = await loadUserConfig();
+  const project = config.protectedProjects.find(p => p.rootPath === rootPath);
+  if (project) {
+    project.protectedPaths = [...protectedPaths];
+    project.lastAccessedAt = new Date();
+    await saveUserConfig(config);
+  }
 }
 
 /**
@@ -377,11 +528,44 @@ export function validateUserConfig(config: UserConfig): string[] {
     errors.push('Machine UUID is required');
   }
 
-  if (config.directoryQuota < 0) {
+  // Validate project quota
+  if (config.projectQuota < 0) {
+    errors.push('Project quota must be non-negative');
+  }
+
+  // Validate protected projects array
+  if (!Array.isArray(config.protectedProjects)) {
+    errors.push('Protected projects must be an array');
+  } else {
+    // Validate each project
+    config.protectedProjects.forEach((project, index) => {
+      if (!project.id || typeof project.id !== 'string') {
+        errors.push(`Protected project ${index}: ID is required and must be a string`);
+      }
+      if (!project.rootPath || typeof project.rootPath !== 'string') {
+        errors.push(`Protected project ${index}: Root path is required and must be a string`);
+      }
+      if (!project.type || !['git', 'directory'].includes(project.type)) {
+        errors.push(`Protected project ${index}: Type must be 'git' or 'directory'`);
+      }
+      if (!project.name || typeof project.name !== 'string') {
+        errors.push(`Protected project ${index}: Name is required and must be a string`);
+      }
+      if (!Array.isArray(project.protectedPaths)) {
+        errors.push(`Protected project ${index}: Protected paths must be an array`);
+      }
+      if (!project.createdAt || !(project.createdAt instanceof Date)) {
+        errors.push(`Protected project ${index}: Created date is required and must be a Date`);
+      }
+    });
+  }
+
+  // Legacy compatibility validation
+  if (config.directoryQuota !== undefined && config.directoryQuota < 0) {
     errors.push('Directory quota must be non-negative');
   }
 
-  if (!Array.isArray(config.lockedDirectories)) {
+  if (config.lockedDirectories !== undefined && !Array.isArray(config.lockedDirectories)) {
     errors.push('Locked directories must be an array');
   }
 
@@ -441,10 +625,107 @@ export async function restoreUserConfig(backupPath: string): Promise<void> {
 }
 
 /**
- * Repair corrupted user configuration
+ * Repair a user config object (synchronous version for testing)
+ */
+export function repairUserConfig(config: UserConfig): UserConfig {
+  const repaired = { ...config };
+  
+  // Fix version
+  if (!repaired.version || typeof repaired.version !== 'string') {
+    repaired.version = '2';
+  }
+  
+  // Fix machine UUID
+  if (!repaired.machineUuid) {
+    repaired.machineUuid = '';
+  }
+  
+  // Fix quotas
+  if (typeof repaired.projectQuota !== 'number' || repaired.projectQuota < 0) {
+    repaired.projectQuota = 5;
+  }
+  if (repaired.directoryQuota !== undefined && (typeof repaired.directoryQuota !== 'number' || repaired.directoryQuota < 0)) {
+    repaired.directoryQuota = 5;
+  }
+  
+  // Fix arrays
+  if (!Array.isArray(repaired.protectedProjects)) {
+    repaired.protectedProjects = [];
+  } else {
+    // Filter out invalid projects and remove duplicates
+    const seenIds = new Set<string>();
+    const seenPaths = new Set<string>();
+    repaired.protectedProjects = repaired.protectedProjects.filter(project => {
+      if (!project || typeof project !== 'object') return false;
+      if (!project.id || !project.rootPath || !project.type || !project.name) return false;
+      if (!['git', 'directory'].includes(project.type)) return false;
+      
+      // Remove duplicates by ID
+      if (seenIds.has(project.id)) return false;
+      
+      // Consolidate duplicates by path - keep first occurrence
+      if (seenPaths.has(project.rootPath)) return false;
+      
+      seenIds.add(project.id);
+      seenPaths.add(project.rootPath);
+      
+      // Fix protected paths
+      if (!Array.isArray(project.protectedPaths)) {
+        project.protectedPaths = [];
+      }
+      
+      return true;
+    });
+  }
+  
+  if (!Array.isArray(repaired.lockedDirectories)) {
+    repaired.lockedDirectories = [];
+  } else {
+    repaired.lockedDirectories = repaired.lockedDirectories.filter(dir => 
+      dir && typeof dir === 'string'
+    );
+  }
+  
+  // Fix booleans
+  if (typeof repaired.analyticsEnabled !== 'boolean') {
+    repaired.analyticsEnabled = false;
+  }
+  
+  if (repaired.telemetryOptOut !== undefined && typeof repaired.telemetryOptOut !== 'boolean') {
+    repaired.telemetryOptOut = false;
+  }
+  
+  // Fix privacy level
+  if (repaired.privacyLevel && !['minimal', 'standard', 'enhanced'].includes(repaired.privacyLevel)) {
+    repaired.privacyLevel = 'standard';
+  }
+  
+  // Fix dates
+  if (repaired.lastSyncAt && !(repaired.lastSyncAt instanceof Date)) {
+    if (typeof repaired.lastSyncAt === 'string') {
+      try {
+        repaired.lastSyncAt = new Date(repaired.lastSyncAt);
+      } catch {
+        delete repaired.lastSyncAt;
+      }
+    } else {
+      delete repaired.lastSyncAt;
+    }
+  }
+  
+  // Fix auth token type
+  if (repaired.authToken !== undefined && typeof repaired.authToken !== 'string') {
+    delete repaired.authToken;
+  }
+  
+  return repaired;
+}
+
+/**
+ * Repair corrupted user configuration (async version)
  * Attempts to fix issues automatically or reset to defaults
  */
-export async function repairUserConfig(): Promise<{
+export async function repairUserConfigAsync(): Promise<{
   repaired: boolean;
   issuesFixed: string[];
   hadToReset: boolean;
@@ -500,15 +781,15 @@ export async function repairUserConfig(): Promise<{
     }
     
     // Fix negative quota
-    if (config.directoryQuota < 0) {
-      config.directoryQuota = DEFAULT_USER_CONFIG.directoryQuota;
+    if (config.directoryQuota !== undefined && config.directoryQuota < 0) {
+      config.directoryQuota = DEFAULT_USER_CONFIG.directoryQuota ?? 2;
       issuesFixed.push('Reset negative directory quota to default');
       configChanged = true;
       repaired = true;
     }
     
     // Fix invalid locked directories array
-    if (!Array.isArray(config.lockedDirectories)) {
+    if (config.lockedDirectories !== undefined && !Array.isArray(config.lockedDirectories)) {
       config.lockedDirectories = [];
       issuesFixed.push('Reset invalid locked directories array');
       configChanged = true;
@@ -551,6 +832,139 @@ export async function repairUserConfig(): Promise<{
       throw new Error(`Critical error: Cannot repair or reset user config: ${resetError instanceof Error ? resetError.message : String(resetError)}`);
     }
   }
+}
+
+/**
+ * Migrate legacy lockedDirectories to protectedProjects
+ */
+export async function migrateLegacyDirectoriesToProjects(config: UserConfig): Promise<UserConfig> {
+  // Clone config to avoid mutations
+  const migratedConfig = { ...config };
+  
+  // Update version
+  migratedConfig.version = '2';
+  
+  // If no legacy directories, just return with updated version
+  if (!config.lockedDirectories || config.lockedDirectories.length === 0) {
+    return migratedConfig;
+  }
+
+  // Import dependencies dynamically to avoid circular dependencies
+  const { getRepoRoot } = await import('./git.js');
+  const { existsSync, statSync } = await import('fs');
+  const { basename, dirname, resolve, relative } = await import('path');
+  const crypto = await import('crypto');
+  const { filterTempDirectories, isValidProjectRoot } = await import('./project-utils.js');
+
+  // Filter out temp directories
+  const validPaths = filterTempDirectories(config.lockedDirectories);
+  
+  // Start with existing projects or empty array
+  const projectsMap = new Map<string, ProjectUnit>();
+  
+  // Add existing projects to map
+  if (config.protectedProjects) {
+    for (const project of config.protectedProjects) {
+      projectsMap.set(project.rootPath, project);
+    }
+  }
+
+  // Process each legacy path
+  for (const filePath of validPaths) {
+    // Skip invalid paths
+    if (!filePath || typeof filePath !== 'string') {
+      continue;
+    }
+
+    try {
+      // Determine if this is a file or directory
+      let targetPath = filePath;
+      let relativePath = '.';
+      
+      if (existsSync(filePath)) {
+        const stats = statSync(filePath);
+        if (stats.isFile()) {
+          // For files, get the parent directory as the project root
+          targetPath = dirname(filePath);
+          relativePath = basename(filePath);
+        }
+      } else {
+        // If path doesn't exist, assume it's a file and get parent directory
+        targetPath = dirname(filePath);
+        relativePath = basename(filePath);
+      }
+      
+      // Skip invalid project roots
+      if (!isValidProjectRoot(targetPath)) {
+        continue;
+      }
+
+      // Check if this path is part of a Git repository
+      const repoRoot = await getRepoRoot(targetPath);
+      const projectRoot = repoRoot || targetPath;
+      const projectType: ProjectType = repoRoot ? 'git' : 'directory';
+      
+      // Check if we already have a project for this root
+      if (projectsMap.has(projectRoot)) {
+        const existingProject = projectsMap.get(projectRoot)!;
+        
+        // Calculate relative path from project root
+        const relPath = repoRoot 
+          ? relative(repoRoot, filePath)
+          : relativePath;
+        
+        // Add to protected paths if not already there
+        if (!existingProject.protectedPaths.includes(relPath)) {
+          existingProject.protectedPaths.push(relPath);
+        }
+        
+        // Update last accessed time
+        existingProject.lastAccessedAt = new Date();
+      } else {
+        // Create new project
+        const projectId = crypto.randomUUID();
+        const projectName = basename(projectRoot) || 'project';
+        
+        // Calculate relative path from project root
+        const relPath = repoRoot 
+          ? relative(repoRoot, filePath)
+          : relativePath;
+        
+        const newProject: ProjectUnit = {
+          id: projectId,
+          rootPath: projectRoot,
+          type: projectType,
+          name: projectName,
+          protectedPaths: [relPath],
+          createdAt: new Date(),
+          lastAccessedAt: new Date()
+        };
+        
+        projectsMap.set(projectRoot, newProject);
+      }
+    } catch (error) {
+      // Log error but continue with other paths
+      if (process.env.AILOCK_DEBUG === 'true') {
+        console.log(`Debug: Failed to process path ${filePath} during migration: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  // Convert map to array
+  migratedConfig.protectedProjects = Array.from(projectsMap.values());
+  
+  // Update project quota if not set
+  if (!migratedConfig.projectQuota) {
+    migratedConfig.projectQuota = migratedConfig.directoryQuota || 5;
+  }
+  
+  if (process.env.AILOCK_DEBUG === 'true') {
+    console.log(`Debug: Migrated ${config.lockedDirectories.length} paths to ${migratedConfig.protectedProjects.length} projects`);
+  }
+  
+  // Note: We don't save here as this is a pure function for testing
+  // The caller should save if needed
+  return migratedConfig;
 }
 
 /**

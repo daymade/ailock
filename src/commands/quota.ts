@@ -7,8 +7,13 @@ import {
   getTrackedDirectories,
   validateDirectoryTracking,
   resetDirectoryTracking,
-  repairDirectoryTracking
+  repairDirectoryTracking,
+  // New project-based functions
+  getProjectQuotaUsage,
+  getProjectQuotaStatusSummary,
+  getProtectedProjectsList
 } from '../core/directory-tracker.js';
+import { getProjectDisplayPath, getProjectStats } from '../core/project-utils.js';
 import { 
   loadUserConfig, 
   getUserConfigDebugInfo, 
@@ -16,7 +21,7 @@ import {
   getOfflineMode,
   setAnalyticsEnabled,
   getAnalyticsEnabled,
-  repairUserConfig,
+  repairUserConfigAsync,
   setPrivacyLevel,
   getPrivacyLevel,
   setTelemetryOptOut,
@@ -31,58 +36,76 @@ import { info, success, error, warn } from '../utils/output.js';
  */
 async function showQuotaStatus(): Promise<void> {
   try {
-    const quotaUsage = await getQuotaUsage();
-    const quotaStatusSummary = await getQuotaStatusSummary();
+    const projectQuotaUsage = await getProjectQuotaUsage();
+    const projectQuotaStatusSummary = await getProjectQuotaStatusSummary();
     
-    info(chalk.blue.bold('📊 Directory Quota Status\n'));
+    info(chalk.blue.bold('📊 Project Protection Status\n'));
     
     // Overall status
-    if (quotaUsage.withinQuota) {
-      success(`✅ ${quotaStatusSummary}`);
+    if (projectQuotaUsage.withinQuota) {
+      success(`✅ ${projectQuotaStatusSummary}`);
     } else {
-      error(`🚫 ${quotaStatusSummary}`);
+      error(`🚫 ${projectQuotaStatusSummary}`);
     }
     
     // Detailed breakdown
     info(chalk.cyan('\n📈 Quota Details:'));
-    info(chalk.gray(`   Used: ${quotaUsage.used} directories`));
-    info(chalk.gray(`   Limit: ${quotaUsage.quota} directories`));
-    info(chalk.gray(`   Available: ${quotaUsage.available} directories`));
+    info(chalk.gray(`   Used: ${projectQuotaUsage.used} projects`));
+    info(chalk.gray(`   Limit: ${projectQuotaUsage.quota} projects`));
+    info(chalk.gray(`   Available: ${projectQuotaUsage.available} projects`));
     
     // Progress bar visualization
     const progressBarWidth = 20;
-    const usedWidth = Math.min(progressBarWidth, Math.ceil((quotaUsage.used / quotaUsage.quota) * progressBarWidth));
+    const usedWidth = Math.min(progressBarWidth, Math.ceil((projectQuotaUsage.used / projectQuotaUsage.quota) * progressBarWidth));
     const remainingWidth = progressBarWidth - usedWidth;
     
     const usedBar = '█'.repeat(usedWidth);
     const remainingBar = '░'.repeat(remainingWidth);
     
-    if (quotaUsage.withinQuota) {
-      info(chalk.green(`   [${usedBar}${remainingBar}] ${Math.round((quotaUsage.used / quotaUsage.quota) * 100)}%`));
+    if (projectQuotaUsage.withinQuota) {
+      info(chalk.green(`   [${usedBar}${remainingBar}] ${Math.round((projectQuotaUsage.used / projectQuotaUsage.quota) * 100)}%`));
     } else {
-      info(chalk.red(`   [${usedBar}${remainingBar}] ${Math.round((quotaUsage.used / quotaUsage.quota) * 100)}%`));
+      info(chalk.red(`   [${usedBar}${remainingBar}] ${Math.round((projectQuotaUsage.used / projectQuotaUsage.quota) * 100)}%`));
     }
     
-    // Show locked directories
-    const trackedDirs = await getTrackedDirectories();
-    if (trackedDirs.length > 0) {
-      info(chalk.cyan('\n📁 Tracked Directories:'));
-      for (const dir of trackedDirs) {
-        info(chalk.gray(`   🔒 ${dir}`));
+    // Show protected projects
+    if (projectQuotaUsage.projects.length > 0) {
+      info(chalk.cyan('\n📁 Protected Projects:'));
+      
+      for (const project of projectQuotaUsage.projects) {
+        const displayPath = getProjectDisplayPath(project.rootPath);
+        const typeIcon = project.type === 'git' ? '📦' : '📁';
+        const typeLabel = project.type === 'git' ? 'Git repository' : 'Directory';
+        
+        info(chalk.gray(`   ${typeIcon} ${project.name} (${typeLabel})`));
+        info(chalk.dim(`      ${displayPath}`));
+        
+        if (project.protectedPaths.length > 1) {
+          info(chalk.dim(`      └─ ${project.protectedPaths.length} protected files/directories`));
+        }
+      }
+      
+      // Show statistics
+      const stats = projectQuotaUsage.stats;
+      if (stats.total > 0) {
+        info(chalk.cyan('\n📊 Project Statistics:'));
+        info(chalk.gray(`   📦 Git repositories: ${stats.gitProjects}`));
+        info(chalk.gray(`   📁 Standalone directories: ${stats.directoryProjects}`));
+        info(chalk.gray(`   🔒 Total protected files/directories: ${stats.totalProtectedPaths}`));
       }
     } else {
-      info(chalk.yellow('\n📁 No directories are currently being tracked.'));
-      info(chalk.gray('   Lock some files to start using your quota.'));
+      info(chalk.yellow('\n📁 No projects are currently protected.'));
+      info(chalk.gray('   Lock some files to start protecting your projects.'));
     }
     
     // Recommendations
-    if (!quotaUsage.withinQuota) {
+    if (!projectQuotaUsage.withinQuota) {
       info(chalk.blue('\n🚀 Increase Your Quota:'));
       info(chalk.gray('   1. Visit the ailock web portal'));
       info(chalk.gray('   2. Get auth codes through signup or referrals'));
       info(chalk.gray('   3. Run: ailock auth <your-auth-code>'));
-      info(chalk.gray('   4. Continue protecting more directories'));
-    } else if (quotaUsage.available <= 1) {
+      info(chalk.gray('   4. Continue protecting more projects'));
+    } else if (projectQuotaUsage.available <= 1) {
       info(chalk.yellow('\n⚠️  Running Low on Quota:'));
       info(chalk.gray('   Consider getting more auth codes before you need them.'));
       info(chalk.gray('   Visit the web portal to increase your quota.'));
@@ -164,7 +187,8 @@ async function showDebugInfo(): Promise<void> {
     info(chalk.cyan('👤 User Configuration:'));
     info(chalk.gray(`   Machine UUID: ${debugConfig.machineUuid || 'Not set'}`));
     info(chalk.gray(`   Directory Quota: ${debugConfig.directoryQuota}`));
-    info(chalk.gray(`   Tracked Directories: ${debugConfig.lockedDirectories.length}`));
+    info(chalk.gray(`   Tracked Directories: ${debugConfig.lockedDirectories?.length ?? 0}`));
+    info(chalk.gray(`   Protected Projects: ${debugConfig.protectedProjects?.length ?? 0}`));
     info(chalk.gray(`   Analytics Enabled: ${debugConfig.analyticsEnabled}`));
     info(chalk.gray(`   Offline Mode: ${debugConfig.offlineMode || false}`));
     info(chalk.gray(`   Last Sync: ${debugConfig.lastSyncAt || 'Never'}`));
@@ -239,7 +263,7 @@ async function repairQuota(auto: boolean): Promise<void> {
     
     // Repair user configuration
     info(chalk.gray('   Checking user configuration...'));
-    const configRepairResult = await repairUserConfig();
+    const configRepairResult = await repairUserConfigAsync();
     
     if (configRepairResult.repaired) {
       success('✅ User configuration repaired');

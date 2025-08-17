@@ -1,5 +1,5 @@
 import { tmpdir } from 'os';
-import { mkdir, rmdir, writeFile } from 'fs/promises';
+import { mkdir, rm, writeFile } from 'fs/promises';
 import path from 'path';
 import { expect } from 'vitest';
 
@@ -46,7 +46,7 @@ export class SecurityTestEnvironment {
     // Clean up directories
     for (const dir of this.testDirs) {
       try {
-        await rmdir(dir, { recursive: true });
+        await rm(dir, { recursive: true, force: true });
       } catch {
         // Ignore cleanup errors
       }

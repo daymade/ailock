@@ -51,3 +51,7 @@ logs/
 .ailock.session
 test-results/
 .test-temp/
+
+# Documentation build cache
+docs/.vitepress/cache/
+docs/.vitepress/dist/

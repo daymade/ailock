@@ -34,7 +34,11 @@ export type UsageEventType =
   | 'lock_attempt_blocked'
   | 'directory_locked' 
   | 'directory_unlocked'
-  | 'status_check';
+  | 'status_check'
+  // New project-based events
+  | 'project_protected'
+  | 'project_unprotected'
+  | 'project_quota_exceeded';
 
 /**
  * Rate limiter to prevent API abuse

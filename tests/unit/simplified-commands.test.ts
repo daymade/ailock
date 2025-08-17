@@ -15,6 +15,9 @@ describe('simplified command behavior', () => {
     mkdirSync(TEST_DIR, { recursive: true });
     mkdirSync(PROJECT_DIR, { recursive: true });
     
+    // Initialize git repository for gitignore tests
+    execSync('git init', { cwd: PROJECT_DIR, stdio: 'ignore' });
+    
     // Create test project with .gitignore
     writeFileSync(path.join(PROJECT_DIR, 'package.json'), JSON.stringify({
       name: 'test-project',
@@ -36,12 +39,12 @@ describe('simplified command behavior', () => {
     it('should include gitignore by default', () => {
       // Create .ailock config first
       execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts init --config-only`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js init --config-only`,
         { cwd: path.join(__dirname, '../..') }
       );
 
       const result = execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts lock --dry-run --verbose`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js lock --dry-run --verbose`,
         { encoding: 'utf-8', cwd: path.join(__dirname, '../..') }
       );
 
@@ -55,12 +58,12 @@ describe('simplified command behavior', () => {
     it('should exclude gitignore with --no-gitignore', () => {
       // Create .ailock config first
       execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts init --config-only`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js init --config-only`,
         { cwd: path.join(__dirname, '../..') }
       );
 
       const result = execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts lock --no-gitignore --dry-run --verbose`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js lock --no-gitignore --dry-run --verbose`,
         { encoding: 'utf-8', cwd: path.join(__dirname, '../..') }
       );
 
@@ -73,12 +76,12 @@ describe('simplified command behavior', () => {
     it('should include gitignore by default', () => {
       // Create .ailock config and lock files first
       execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts init --config-only`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js init --config-only`,
         { cwd: path.join(__dirname, '../..') }
       );
 
       const result = execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts unlock --dry-run --verbose`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js unlock --dry-run --verbose`,
         { encoding: 'utf-8', cwd: path.join(__dirname, '../..') }
       );
 
@@ -88,12 +91,12 @@ describe('simplified command behavior', () => {
     it('should exclude gitignore with --no-gitignore', () => {
       // Create .ailock config first
       execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts init --config-only`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js init --config-only`,
         { cwd: path.join(__dirname, '../..') }
       );
 
       const result = execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts unlock --no-gitignore --dry-run --verbose`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js unlock --no-gitignore --dry-run --verbose`,
         { encoding: 'utf-8', cwd: path.join(__dirname, '../..') }
       );
 
@@ -105,12 +108,12 @@ describe('simplified command behavior', () => {
     it('should show simple output in non-interactive environment', () => {
       // Create .ailock config first
       execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts init --config-only`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js init --config-only`,
         { cwd: path.join(__dirname, '../..') }
       );
 
       const result = execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts status`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js status`,
         { encoding: 'utf-8', cwd: path.join(__dirname, '../..'), env: { ...process.env, CI: 'true' } }
       );
 
@@ -121,12 +124,12 @@ describe('simplified command behavior', () => {
     it('should show detailed output with --verbose', () => {
       // Create .ailock config first
       execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts init --config-only`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js init --config-only`,
         { cwd: path.join(__dirname, '../..') }
       );
 
       const result = execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts status --verbose`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js status --verbose`,
         { encoding: 'utf-8', cwd: path.join(__dirname, '../..') }
       );
 
@@ -138,12 +141,12 @@ describe('simplified command behavior', () => {
     it('should show simple output with --simple', () => {
       // Create .ailock config first
       execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts init --config-only`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js init --config-only`,
         { cwd: path.join(__dirname, '../..') }
       );
 
       const result = execSync(
-        `cd "${PROJECT_DIR}" && npx tsx ../../src/index.ts status --simple`,
+        `cd "${PROJECT_DIR}" && node ../../dist/index.js status --simple`,
         { encoding: 'utf-8', cwd: path.join(__dirname, '../..') }
       );
 
