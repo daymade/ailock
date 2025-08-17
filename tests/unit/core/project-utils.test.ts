@@ -18,6 +18,11 @@ import {
 import { ProjectUnit, ProjectType } from '../../../src/core/user-config';
 import { createTestDirectory, cleanupTestDirectory } from '../../test-utils';
 
+// Mock the git module before importing
+vi.mock('../../../src/core/git', () => ({
+  getRepoRoot: vi.fn()
+}));
+
 describe('project-utils', () => {
   let testDir: string;
   let gitRepoDir: string;
@@ -39,10 +44,26 @@ describe('project-utils', () => {
     // Create some test files
     await fs.promises.writeFile(path.join(gitRepoDir, 'file1.txt'), 'content1');
     await fs.promises.writeFile(path.join(normalDir, 'file2.txt'), 'content2');
+    
+    // Mock git detection
+    const { getRepoRoot } = await import('../../../src/core/git');
+    vi.mocked(getRepoRoot).mockImplementation(async (dir: string) => {
+      // If the path is within our gitRepoDir, return it as the repo root
+      if (dir && (dir === gitRepoDir || dir.startsWith(gitRepoDir + '/'))) {
+        // Check for nested repos first
+        const nestedRepoPath = path.join(gitRepoDir, 'nested');
+        if (dir.startsWith(nestedRepoPath + '/') || dir === nestedRepoPath) {
+          return nestedRepoPath;
+        }
+        return gitRepoDir;
+      }
+      return null;
+    });
   });
 
   afterEach(async () => {
     await cleanupTestDirectory(testDir);
+    vi.clearAllMocks();
   });
 
   describe('detectGitRepository', () => {
@@ -172,26 +193,30 @@ describe('project-utils', () => {
   });
 
   describe('findMatchingProject', () => {
-    const projects: ProjectUnit[] = [
-      {
-        id: 'proj1',
-        rootPath: gitRepoDir,
-        type: 'git',
-        name: 'git-repo',
-        protectedPaths: ['file1.txt'],
-        createdAt: new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString()
-      },
-      {
-        id: 'proj2',
-        rootPath: normalDir,
-        type: 'directory',
-        name: 'normal-dir',
-        protectedPaths: ['file2.txt'],
-        createdAt: new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString()
-      }
-    ];
+    let projects: ProjectUnit[];
+
+    beforeEach(() => {
+      projects = [
+        {
+          id: 'proj1',
+          rootPath: gitRepoDir,
+          type: 'git',
+          name: 'git-repo',
+          protectedPaths: ['file1.txt'],
+          createdAt: new Date().toISOString(),
+          lastAccessedAt: new Date().toISOString()
+        },
+        {
+          id: 'proj2',
+          rootPath: normalDir,
+          type: 'directory',
+          name: 'normal-dir',
+          protectedPaths: ['file2.txt'],
+          createdAt: new Date().toISOString(),
+          lastAccessedAt: new Date().toISOString()
+        }
+      ];
+    });
 
     it('should find matching git project', async () => {
       const project = await findMatchingProject(
@@ -280,9 +305,10 @@ describe('project-utils', () => {
 
   describe('isValidProjectRoot', () => {
     it('should accept valid project roots', () => {
-      expect(isValidProjectRoot('/home/user/project')).toBe(true);
-      expect(isValidProjectRoot('/Users/user/Documents/work')).toBe(true);
-      expect(isValidProjectRoot('C:\\Users\\User\\Projects')).toBe(true);
+      // Use test directories that actually exist
+      expect(isValidProjectRoot(gitRepoDir)).toBe(true);
+      expect(isValidProjectRoot(normalDir)).toBe(true);
+      expect(isValidProjectRoot(testDir)).toBe(true);
     });
 
     it('should reject system directories', () => {
@@ -307,7 +333,7 @@ describe('project-utils', () => {
       const projects: ProjectUnit[] = [
         {
           id: 'proj1',
-          rootPath: '/home/user/project',
+          rootPath: gitRepoDir,
           type: 'git',
           name: 'project',
           protectedPaths: ['file1.txt'],
@@ -316,7 +342,7 @@ describe('project-utils', () => {
         },
         {
           id: 'proj2',
-          rootPath: '/home/user/project',
+          rootPath: gitRepoDir,
           type: 'git',
           name: 'project',
           protectedPaths: ['file2.txt'],
@@ -343,7 +369,7 @@ describe('project-utils', () => {
       const projects: ProjectUnit[] = [
         {
           id: 'proj1',
-          rootPath: '/home/user/project1',
+          rootPath: gitRepoDir,
           type: 'git',
           name: 'project1',
           protectedPaths: ['file1.txt'],
@@ -352,7 +378,7 @@ describe('project-utils', () => {
         },
         {
           id: 'proj2',
-          rootPath: '/home/user/project2',
+          rootPath: normalDir,
           type: 'directory',
           name: 'project2',
           protectedPaths: ['file2.txt'],
@@ -369,7 +395,7 @@ describe('project-utils', () => {
       const projects: ProjectUnit[] = [
         {
           id: 'proj1',
-          rootPath: '/home/user/project',
+          rootPath: gitRepoDir,
           type: 'git',
           name: 'project',
           protectedPaths: ['file1.txt', 'file2.txt'],
@@ -378,7 +404,7 @@ describe('project-utils', () => {
         },
         {
           id: 'proj2',
-          rootPath: '/home/user/project',
+          rootPath: gitRepoDir,
           type: 'git',
           name: 'project',
           protectedPaths: ['file2.txt', 'file3.txt'],

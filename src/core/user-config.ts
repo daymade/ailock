@@ -631,7 +631,7 @@ export function repairUserConfig(config: UserConfig): UserConfig {
   const repaired = { ...config };
   
   // Fix version
-  if (!repaired.version || typeof repaired.version !== 'string') {
+  if (!repaired.version || typeof repaired.version !== 'string' || !['1', '2', '2.0.0'].includes(repaired.version)) {
     repaired.version = '2';
   }
   

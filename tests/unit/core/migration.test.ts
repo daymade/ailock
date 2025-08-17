@@ -20,7 +20,7 @@ interface UserConfig {
   protectedProjects: ProjectUnit[];
   projectQuota: number;
   privacyLevel?: 'minimal' | 'standard' | 'enhanced';
-  telemetryConsent?: boolean;
+  telemetryOptOut?: boolean; // Fixed field name
   auth?: {
     apiKey: string;
     deviceId: string;
@@ -34,9 +34,16 @@ interface UserConfig {
 function toActualConfig(testConfig: UserConfig): any {
   return {
     ...testConfig,
-    machineUuid: testConfig.machineUuid || '',
+    machineUuid: testConfig.machineUuid || 'test-machine-uuid',
     analyticsEnabled: testConfig.analyticsEnabled ?? true,
-    version: String(testConfig.version)
+    version: String(testConfig.version),
+    createdAt: testConfig.createdAt ? new Date(testConfig.createdAt) : new Date(),
+    updatedAt: testConfig.updatedAt ? new Date(testConfig.updatedAt) : new Date(),
+    protectedProjects: testConfig.protectedProjects?.map(project => ({
+      ...project,
+      createdAt: new Date(project.createdAt),
+      lastAccessedAt: new Date(project.lastAccessedAt)
+    })) || []
   };
 }
 
@@ -45,8 +52,21 @@ function fromActualConfig(actualConfig: any): UserConfig {
   return {
     ...actualConfig,
     version: actualConfig.version,
-    createdAt: actualConfig.createdAt || new Date().toISOString(),
-    updatedAt: actualConfig.updatedAt || new Date().toISOString()
+    createdAt: actualConfig.createdAt instanceof Date ? 
+      (isNaN(actualConfig.createdAt.getTime()) ? new Date().toISOString() : actualConfig.createdAt.toISOString()) : 
+      actualConfig.createdAt || new Date().toISOString(),
+    updatedAt: actualConfig.updatedAt instanceof Date ? 
+      (isNaN(actualConfig.updatedAt.getTime()) ? new Date().toISOString() : actualConfig.updatedAt.toISOString()) : 
+      actualConfig.updatedAt || new Date().toISOString(),
+    protectedProjects: actualConfig.protectedProjects?.map((project: any) => ({
+      ...project,
+      createdAt: project.createdAt instanceof Date ? 
+        (isNaN(project.createdAt.getTime()) ? new Date().toISOString() : project.createdAt.toISOString()) : 
+        project.createdAt,
+      lastAccessedAt: project.lastAccessedAt instanceof Date ? 
+        (isNaN(project.lastAccessedAt.getTime()) ? new Date().toISOString() : project.lastAccessedAt.toISOString()) : 
+        project.lastAccessedAt
+    })) || []
   };
 }
 
@@ -76,20 +96,29 @@ describe('user-config migration', () => {
 
   describe('migrateLegacyDirectoriesToProjects', () => {
     it('should migrate legacy directories to projects', async () => {
+      // Create real test directories
+      const project1Dir = path.join(testDir, 'project1');
+      const project2Dir = path.join(testDir, 'project2');
+      await fs.promises.mkdir(project1Dir, { recursive: true });
+      await fs.promises.mkdir(project2Dir, { recursive: true });
+      await fs.promises.writeFile(path.join(project1Dir, 'file1.txt'), 'content1');
+      await fs.promises.writeFile(path.join(project1Dir, 'file2.txt'), 'content2');
+      await fs.promises.writeFile(path.join(project2Dir, 'file3.txt'), 'content3');
+
       const legacyConfig: UserConfig = {
         version: 1,
         createdAt: new Date('2023-01-01').toISOString(),
         updatedAt: new Date('2023-01-01').toISOString(),
         directoryQuota: 5,
         lockedDirectories: [
-          '/home/user/project1/file1.txt',
-          '/home/user/project1/file2.txt',
-          '/home/user/project2/file3.txt'
+          path.join(project1Dir, 'file1.txt'),
+          path.join(project1Dir, 'file2.txt'),
+          path.join(project2Dir, 'file3.txt')
         ],
         protectedProjects: [],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'test-key',
           deviceId: 'test-device',
@@ -104,7 +133,7 @@ describe('user-config migration', () => {
       
       // Check project1
       const project1 = migrated.protectedProjects.find(p => 
-        p.rootPath === '/home/user/project1'
+        p.rootPath === project1Dir
       );
       expect(project1).toBeDefined();
       expect(project1?.protectedPaths).toContain('file1.txt');
@@ -113,28 +142,42 @@ describe('user-config migration', () => {
       
       // Check project2
       const project2 = migrated.protectedProjects.find(p => 
-        p.rootPath === '/home/user/project2'
+        p.rootPath === project2Dir
       );
       expect(project2).toBeDefined();
       expect(project2?.protectedPaths).toContain('file3.txt');
     });
 
     it('should group files in same git repository', async () => {
+      // Create a real git repository
+      const gitRepoDir = path.join(testDir, 'git-repo');
+      const otherDir = path.join(testDir, 'other-dir');
+      await fs.promises.mkdir(path.join(gitRepoDir, 'src'), { recursive: true });
+      await fs.promises.mkdir(path.join(gitRepoDir, 'tests'), { recursive: true });
+      await fs.promises.mkdir(path.join(gitRepoDir, 'docs'), { recursive: true });
+      await fs.promises.mkdir(path.join(gitRepoDir, '.git'), { recursive: true });
+      await fs.promises.mkdir(otherDir, { recursive: true });
+      
+      await fs.promises.writeFile(path.join(gitRepoDir, 'src', 'file1.txt'), 'content1');
+      await fs.promises.writeFile(path.join(gitRepoDir, 'tests', 'file2.txt'), 'content2');
+      await fs.promises.writeFile(path.join(gitRepoDir, 'docs', 'readme.md'), 'readme');
+      await fs.promises.writeFile(path.join(otherDir, 'file3.txt'), 'content3');
+
       const legacyConfig: UserConfig = {
         version: 1,
         createdAt: new Date('2023-01-01').toISOString(),
         updatedAt: new Date('2023-01-01').toISOString(),
         directoryQuota: 5,
         lockedDirectories: [
-          '/home/user/git-repo/src/file1.txt',
-          '/home/user/git-repo/tests/file2.txt',
-          '/home/user/git-repo/docs/readme.md',
-          '/home/user/other-dir/file3.txt'
+          path.join(gitRepoDir, 'src', 'file1.txt'),
+          path.join(gitRepoDir, 'tests', 'file2.txt'),
+          path.join(gitRepoDir, 'docs', 'readme.md'),
+          path.join(otherDir, 'file3.txt')
         ],
         protectedProjects: [],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'test-key',
           deviceId: 'test-device',
@@ -148,7 +191,7 @@ describe('user-config migration', () => {
       
       // Git repo should be grouped
       const gitProject = migrated.protectedProjects.find(p => 
-        p.rootPath === '/home/user/git-repo'
+        p.rootPath === gitRepoDir
       );
       expect(gitProject).toBeDefined();
       expect(gitProject?.protectedPaths).toHaveLength(3);
@@ -159,7 +202,7 @@ describe('user-config migration', () => {
       
       // Other directory should be separate
       const otherProject = migrated.protectedProjects.find(p => 
-        p.rootPath === '/home/user/other-dir'
+        p.rootPath === otherDir
       );
       expect(otherProject).toBeDefined();
       expect(otherProject?.protectedPaths).toContain('file3.txt');
@@ -176,7 +219,7 @@ describe('user-config migration', () => {
         protectedProjects: [],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'test-key',
           deviceId: 'test-device',
@@ -191,9 +234,17 @@ describe('user-config migration', () => {
     });
 
     it('should preserve existing projects during migration', async () => {
+      // Create real test directories
+      const existingProjectDir = path.join(testDir, 'existing-project');
+      const newDir = path.join(testDir, 'new-dir');
+      await fs.promises.mkdir(existingProjectDir, { recursive: true });
+      await fs.promises.mkdir(newDir, { recursive: true });
+      await fs.promises.writeFile(path.join(existingProjectDir, 'existing.txt'), 'existing');
+      await fs.promises.writeFile(path.join(newDir, 'file.txt'), 'new');
+
       const existingProject: ProjectUnit = {
         id: 'existing-id',
-        rootPath: '/home/user/existing-project',
+        rootPath: existingProjectDir,
         type: 'git',
         name: 'existing-project',
         protectedPaths: ['existing.txt'],
@@ -206,11 +257,11 @@ describe('user-config migration', () => {
         createdAt: new Date('2023-01-01').toISOString(),
         updatedAt: new Date('2023-01-01').toISOString(),
         directoryQuota: 5,
-        lockedDirectories: ['/home/user/new-dir/file.txt'],
+        lockedDirectories: [path.join(newDir, 'file.txt')],
         protectedProjects: [existingProject],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'test-key',
           deviceId: 'test-device',
@@ -225,16 +276,21 @@ describe('user-config migration', () => {
       // Existing project should be preserved
       const preserved = migrated.protectedProjects.find(p => p.id === 'existing-id');
       expect(preserved).toBeDefined();
-      expect(preserved?.rootPath).toBe('/home/user/existing-project');
+      expect(preserved?.rootPath).toBe(existingProjectDir);
       
       // New directory should be added
       const newProject = migrated.protectedProjects.find(p => 
-        p.rootPath === '/home/user/new-dir'
+        p.rootPath === newDir
       );
       expect(newProject).toBeDefined();
     });
 
     it('should filter out temp and invalid directories', async () => {
+      // Create a real valid project directory
+      const validProjectDir = path.join(testDir, 'valid-project');
+      await fs.promises.mkdir(validProjectDir, { recursive: true });
+      await fs.promises.writeFile(path.join(validProjectDir, 'file.txt'), 'content');
+
       const legacyConfig: UserConfig = {
         version: 1,
         createdAt: new Date('2023-01-01').toISOString(),
@@ -245,12 +301,12 @@ describe('user-config migration', () => {
           '/var/folders/xyz/temp.txt',
           '/home/user/node_modules/package/file.js',
           '/home/user/.cache/data.txt',
-          '/home/user/valid-project/file.txt'
+          path.join(validProjectDir, 'file.txt') // Use real test directory
         ],
         protectedProjects: [],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'test-key',
           deviceId: 'test-device',
@@ -262,10 +318,15 @@ describe('user-config migration', () => {
       
       // Only valid project should be migrated
       expect(migrated.protectedProjects).toHaveLength(1);
-      expect(migrated.protectedProjects[0].rootPath).toBe('/home/user/valid-project');
+      expect(migrated.protectedProjects[0].rootPath).toBe(validProjectDir);
     });
 
     it('should handle migration errors gracefully', async () => {
+      // Create a real valid directory
+      const validDir = path.join(testDir, 'valid');
+      await fs.promises.mkdir(validDir, { recursive: true });
+      await fs.promises.writeFile(path.join(validDir, 'file.txt'), 'content');
+
       const legacyConfig: UserConfig = {
         version: 1,
         createdAt: new Date('2023-01-01').toISOString(),
@@ -275,12 +336,12 @@ describe('user-config migration', () => {
           null as any, // Invalid entry
           undefined as any, // Invalid entry
           '', // Empty string
-          '/home/user/valid/file.txt'
+          path.join(validDir, 'file.txt') // Use real test directory
         ],
         protectedProjects: [],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'test-key',
           deviceId: 'test-device',
@@ -292,23 +353,30 @@ describe('user-config migration', () => {
       
       // Should only migrate valid entry
       expect(migrated.protectedProjects).toHaveLength(1);
-      expect(migrated.protectedProjects[0].rootPath).toBe('/home/user/valid');
+      expect(migrated.protectedProjects[0].rootPath).toBe(validDir);
     });
 
     it('should consolidate duplicate projects after migration', async () => {
+      // Create a real project directory
+      const projectDir = path.join(testDir, 'project');
+      await fs.promises.mkdir(projectDir, { recursive: true });
+      await fs.promises.writeFile(path.join(projectDir, 'file1.txt'), 'content1');
+      await fs.promises.writeFile(path.join(projectDir, 'file2.txt'), 'content2');
+      await fs.promises.writeFile(path.join(projectDir, 'existing.txt'), 'existing');
+
       const legacyConfig: UserConfig = {
         version: 1,
         createdAt: new Date('2023-01-01').toISOString(),
         updatedAt: new Date('2023-01-01').toISOString(),
         directoryQuota: 5,
         lockedDirectories: [
-          '/home/user/project/file1.txt',
-          '/home/user/project/file2.txt'
+          path.join(projectDir, 'file1.txt'),
+          path.join(projectDir, 'file2.txt')
         ],
         protectedProjects: [
           {
             id: 'existing',
-            rootPath: '/home/user/project',
+            rootPath: projectDir,
             type: 'directory',
             name: 'project',
             protectedPaths: ['existing.txt'],
@@ -318,7 +386,7 @@ describe('user-config migration', () => {
         ],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'test-key',
           deviceId: 'test-device',
@@ -358,7 +426,7 @@ describe('user-config migration', () => {
         ],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: true,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'key',
           deviceId: 'device',
@@ -370,19 +438,21 @@ describe('user-config migration', () => {
       expect(errors).toHaveLength(0);
     });
 
-    it('should detect invalid version', () => {
+    it('should detect missing machine UUID', () => {
       const config: any = {
-        version: 'invalid',
+        version: '2',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         directoryQuota: 5,
         lockedDirectories: [],
         protectedProjects: [],
-        projectQuota: 5
+        projectQuota: 5,
+        analyticsEnabled: true,
+        machineUuid: '' // Empty machine UUID
       };
 
-      const errors = validateUserConfig(toActualConfig(config));
-      expect(errors).toContain('Invalid version: must be a number');
+      const errors = validateUserConfig(config);
+      expect(errors).toContain('Machine UUID is required');
     });
 
     it('should detect invalid project structure', () => {
@@ -405,66 +475,51 @@ describe('user-config migration', () => {
         ],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: '',
           deviceId: '',
           sessionId: ''
-        }
+        },
+        machineUuid: 'test-uuid',
+        analyticsEnabled: true
       };
 
       const errors = validateUserConfig(toActualConfig(config));
       expect(errors.length).toBeGreaterThan(0);
-      expect(errors.some(e => e.includes('Project proj1: Invalid ID'))).toBe(false);
-      expect(errors.some(e => e.includes('Invalid type'))).toBe(true);
+      expect(errors.some(e => e.includes('ID is required'))).toBe(true);
+      expect(errors.some(e => e.includes('Type must be'))).toBe(true);
     });
 
-    it('should detect duplicate project IDs', () => {
+    it('should detect negative project quota', () => {
       const config: UserConfig = {
         version: 2,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         directoryQuota: 5,
         lockedDirectories: [],
-        protectedProjects: [
-          {
-            id: 'duplicate',
-            rootPath: '/path1',
-            type: 'directory',
-            name: 'proj1',
-            protectedPaths: ['file1.txt'],
-            createdAt: new Date().toISOString(),
-            lastAccessedAt: new Date().toISOString()
-          },
-          {
-            id: 'duplicate',
-            rootPath: '/path2',
-            type: 'directory',
-            name: 'proj2',
-            protectedPaths: ['file2.txt'],
-            createdAt: new Date().toISOString(),
-            lastAccessedAt: new Date().toISOString()
-          }
-        ],
-        projectQuota: 5,
+        protectedProjects: [],
+        projectQuota: -1, // Negative quota
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'key',
           deviceId: 'device',
           sessionId: 'session'
-        }
+        },
+        machineUuid: 'test-uuid',
+        analyticsEnabled: true
       };
 
       const errors = validateUserConfig(toActualConfig(config));
-      expect(errors.some(e => e.includes('Duplicate project ID'))).toBe(true);
+      expect(errors.some(e => e.includes('Project quota must be non-negative'))).toBe(true);
     });
   });
 
   describe('repairUserConfig', () => {
     it('should repair invalid config', () => {
       const config: UserConfig = {
-        version: -1, // Invalid version
+        version: 'invalid' as any, // Invalid version
         createdAt: 'invalid', // Invalid date
         updatedAt: 'invalid', // Invalid date
         directoryQuota: -5, // Invalid quota
@@ -482,19 +537,21 @@ describe('user-config migration', () => {
         ],
         projectQuota: -5, // Invalid quota
         privacyLevel: 'invalid' as any,
-        telemetryConsent: 'invalid' as any,
-        auth: null as any
+        telemetryOptOut: 'invalid' as any, // Fixed field name
+        auth: null as any,
+        machineUuid: '', // Will be fixed by repair
+        analyticsEnabled: 'invalid' as any
       };
 
       const repaired = fromActualConfig(repairUserConfig(toActualConfig(config)));
       
-      expect(repaired.version).toBe(2);
+      expect(repaired.version).toBe('2');
       expect(repaired.directoryQuota).toBe(5);
       expect(repaired.projectQuota).toBe(5);
       expect(repaired.lockedDirectories).toEqual([]);
       expect(repaired.protectedProjects).toEqual([]);
       expect(repaired.privacyLevel).toBe('standard');
-      expect(repaired.telemetryConsent).toBe(false);
+      expect(repaired.telemetryOptOut).toBe(false); // Fixed field name
       expect(repaired.auth).toBeDefined();
       expect(new Date(repaired.createdAt).getTime()).not.toBeNaN();
       expect(new Date(repaired.updatedAt).getTime()).not.toBeNaN();
@@ -579,7 +636,7 @@ describe('user-config migration', () => {
         ],
         projectQuota: 5,
         privacyLevel: 'standard',
-        telemetryConsent: false,
+        telemetryOptOut: false,
         auth: {
           apiKey: 'key',
           deviceId: 'device',

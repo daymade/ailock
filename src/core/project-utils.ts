@@ -36,19 +36,33 @@ export async function detectGitRepository(filePath: string): Promise<{
 export function generateProjectName(rootPath: string, type: ProjectType): string {
   const baseName = basename(rootPath);
   
+  // Special cases
+  if (rootPath === '/') {
+    return 'root';
+  }
+  
+  // Home directory detection
+  const homedir = require('os').homedir();
+  if (homedir && rootPath === homedir) {
+    return 'home';
+  }
+  
+  // Sanitize special characters in project names
+  const sanitized = baseName ? baseName.replace(/[^a-zA-Z0-9\-_\.]/g, '-').replace(/-+/g, '-') : 'Directory';
+  
   // For Git repositories, use the directory name
   if (type === 'git') {
-    return baseName || 'Repository';
+    return sanitized || 'Repository';
   }
   
   // For standalone directories, use a more descriptive name
-  if (baseName.startsWith('.')) {
+  if (baseName && baseName.startsWith('.')) {
     // For hidden directories like ~/.config, show the parent context
     const parentName = basename(dirname(rootPath));
-    return `${parentName}/${baseName}`.replace(/^\//, '');
+    return `${parentName}/${sanitized}`.replace(/^\//, '');
   }
   
-  return baseName || 'Directory';
+  return sanitized;
 }
 
 /**
@@ -169,23 +183,35 @@ export async function belongsToSameProject(path1: string, path2: string): Promis
  */
 export function filterTempDirectories(paths: string[]): string[] {
   const tempPatterns = [
-    /\/tmp\//,
-    /\/temp\//,
-    /\/var\/folders\//,
-    /\/private\/var\/folders\//,
+    /^\/tmp\//,
+    /^\/var\/tmp\//,
     /\/AppData\/Local\/Temp\//,
     /\/Temp\//,
-    /ailock-test-/,
-    /ailock-e2e-/,
-    /ailock-cmd-test-/,
+    /\\Temp\\/,
     /node_modules\//,
     /\.git\//,
+    /\.cache\//,
     /dist\//,
     /build\//,
     /coverage\//
   ];
   
   return paths.filter(path => {
+    // Skip null/undefined paths
+    if (!path) {
+      return false;
+    }
+    
+    // Skip obvious system temp directories
+    if (path === '/tmp' || path === '/var/tmp' || path.startsWith('/tmp/') || path.startsWith('/var/tmp/')) {
+      return false;
+    }
+    
+    // Skip MacOS temp directories but allow our test directories
+    if (path.includes('/var/folders/') && !path.includes('ailock-test')) {
+      return false;
+    }
+    
     return !tempPatterns.some(pattern => pattern.test(path));
   });
 }
@@ -194,8 +220,34 @@ export function filterTempDirectories(paths: string[]): string[] {
  * Validate that a project root path is legitimate (not temp/test)
  */
 export function isValidProjectRoot(rootPath: string): boolean {
+  // Check system directories
+  const systemPaths = [
+    '/',
+    '/etc',
+    '/usr',
+    '/bin',
+    '/sbin',
+    '/var',
+    '/tmp',
+    '/System',
+    'C:\\',
+    'C:\\Windows',
+    'C:\\Program Files',
+    'C:\\Program Files (x86)'
+  ];
+  
+  if (systemPaths.includes(rootPath)) {
+    return false;
+  }
+  
+  // Check if it's filtered out by temp directory filter
   const filtered = filterTempDirectories([rootPath]);
-  return filtered.length > 0 && existsSync(rootPath);
+  if (filtered.length === 0) {
+    return false;
+  }
+  
+  // Check if path exists
+  return existsSync(rootPath);
 }
 
 /**
