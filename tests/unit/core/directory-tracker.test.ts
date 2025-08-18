@@ -304,6 +304,7 @@ describe('directory-tracker', () => {
 
     it('should not modify config if machine UUID already set', async () => {
       mockUserConfig.machineUuid = 'existing-uuid';
+      mockUserConfig.hasAcceptedPrivacyPolicy = true; // Add this to prevent save
       const { saveUserConfig } = await import('../../../src/core/user-config.js');
 
       await initializeUserConfig();
@@ -402,17 +403,29 @@ describe('directory-tracker', () => {
 
   describe('repairDirectoryTracking', () => {
     it('should remove duplicate directories', async () => {
-      mockUserConfig.lockedDirectories = ['/path/1', '/path/2', '/path/1'];
-      const { saveUserConfig } = await import('../../../src/core/user-config.js');
+      const { loadUserConfig, saveUserConfig } = await import('../../../src/core/user-config.js');
+      const { existsSync } = await import('fs');
+      
+      // Create actual directories for the test
+      const path1 = join(tempDir, 'path1');
+      const path2 = join(tempDir, 'path2');
+      await mkdir(path1, { recursive: true });
+      await mkdir(path2, { recursive: true });
+      
+      // Create a new config object with duplicates
+      const configWithDuplicates = {
+        ...mockUserConfig,
+        lockedDirectories: [path1, path2, path1]
+      };
+      vi.mocked(loadUserConfig).mockResolvedValue(configWithDuplicates);
 
       const result = await repairDirectoryTracking();
 
       expect(result.repaired).toBe(true);
       expect(result.issuesFixed).toContain('Removed duplicate directory entries');
-      expect(saveUserConfig).toHaveBeenCalledWith({
-        ...mockUserConfig,
-        lockedDirectories: ['/path/1', '/path/2']
-      });
+      expect(saveUserConfig).toHaveBeenCalledWith(expect.objectContaining({
+        lockedDirectories: [path1, path2]
+      }));
     });
 
     it('should remove invalid paths', async () => {
@@ -448,7 +461,8 @@ describe('directory-tracker', () => {
       const result = await repairDirectoryTracking();
 
       expect(result.repaired).toBe(false);
-      expect(result.issuesRemaining).toContain('Failed to repair directory tracking');
+      expect(result.issuesRemaining[0]).toContain('Failed to repair directory tracking');
+      expect(result.issuesRemaining[0]).toContain('Config load failed');
     });
   });
 

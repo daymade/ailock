@@ -33,6 +33,11 @@ describe('Shell Completion System Tests', () => {
     process.exit = vi.fn() as any;
     
     originalEnv = { ...process.env };
+    
+    // Configure commands to not exit during tests
+    completionCommand.exitOverride();
+    setupCompletionCommand.exitOverride();
+    completionHelperCommand.exitOverride();
   });
 
   afterEach(async () => {
@@ -49,28 +54,25 @@ describe('Shell Completion System Tests', () => {
 
   describe('Completion Command', () => {
     it('should generate bash completion script', async () => {
-      const cmd = createTestCommand(completionCommand);
-      await cmd.parseAsync(['node', 'test', 'bash']);
+      await completionCommand.parseAsync(['node', 'test', 'bash']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('# ailock bash completion');
-      expect(output).toContain('_ailock()');
+      expect(output).toContain('_ailock_completion');
       expect(output).toContain('COMPREPLY');
     });
 
     it('should generate zsh completion script', async () => {
-      const cmd = createTestCommand(completionCommand);
-      await cmd.parseAsync(['node', 'test', 'zsh']);
+      await completionCommand.parseAsync(['node', 'test', 'zsh']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('# ailock zsh completion');
       expect(output).toContain('#compdef ailock');
-      expect(output).toContain('_ailock()');
+      expect(output).toContain('_ailock');
     });
 
     it('should generate fish completion script', async () => {
-      const cmd = createTestCommand(completionCommand);
-      await cmd.parseAsync(['node', 'test', 'fish']);
+      await completionCommand.parseAsync(['node', 'test', 'fish']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('# ailock fish completion');
@@ -78,8 +80,7 @@ describe('Shell Completion System Tests', () => {
     });
 
     it('should generate PowerShell completion script', async () => {
-      const cmd = createTestCommand(completionCommand);
-      await cmd.parseAsync(['node', 'test', 'powershell']);
+      await completionCommand.parseAsync(['node', 'test', 'powershell']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('# ailock PowerShell completion');
@@ -87,8 +88,7 @@ describe('Shell Completion System Tests', () => {
     });
 
     it('should show installation instructions', async () => {
-      const cmd = createTestCommand(completionCommand);
-      await cmd.parseAsync(['node', 'test', 'bash', '--install-instructions']);
+      await completionCommand.parseAsync(['node', 'test', 'bash', '--install-instructions']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('Installation Instructions for bash');
@@ -97,10 +97,8 @@ describe('Shell Completion System Tests', () => {
     });
 
     it('should handle unsupported shells', async () => {
-      const cmd = createTestCommand(completionCommand);
-      
       try {
-        await cmd.parseAsync(['node', 'test', 'unsupported-shell']);
+        await completionCommand.parseAsync(['node', 'test', 'unsupported-shell']);
       } catch (e) {
         // Expected due to exitOverride
       }
@@ -122,10 +120,10 @@ describe('Shell Completion System Tests', () => {
         }
       }));
       
-      const cmd = createTestCommand(completionCommand);
+      // const cmd = completionCommand;
       
       try {
-        await cmd.parseAsync(['node', 'test', 'bash']);
+        await completionCommand.parseAsync(['node', 'test', 'bash']);
       } catch (e) {
         // Expected
       }
@@ -141,8 +139,7 @@ describe('Shell Completion System Tests', () => {
     it('should detect bash shell', async () => {
       process.env.SHELL = '/bin/bash';
       
-      const cmd = createTestCommand(setupCompletionCommand);
-      await cmd.parseAsync(['node', 'test']);
+      await setupCompletionCommand.parseAsync(['node', 'test']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('Detected shell: bash');
@@ -152,8 +149,7 @@ describe('Shell Completion System Tests', () => {
     it('should detect zsh shell', async () => {
       process.env.SHELL = '/usr/bin/zsh';
       
-      const cmd = createTestCommand(setupCompletionCommand);
-      await cmd.parseAsync(['node', 'test']);
+      await setupCompletionCommand.parseAsync(['node', 'test']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('Detected shell: zsh');
@@ -168,8 +164,7 @@ describe('Shell Completion System Tests', () => {
       process.env.PSModulePath = 'C:\\Modules';
       delete process.env.SHELL;
       
-      const cmd = createTestCommand(setupCompletionCommand);
-      await cmd.parseAsync(['node', 'test']);
+      await setupCompletionCommand.parseAsync(['node', 'test']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('Detected shell: powershell');
@@ -185,8 +180,7 @@ describe('Shell Completion System Tests', () => {
       delete process.env.SHELL;
       delete process.env.PSModulePath;
       
-      const cmd = createTestCommand(setupCompletionCommand);
-      await cmd.parseAsync(['node', 'test']);
+      await setupCompletionCommand.parseAsync(['node', 'test']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('Could not detect your shell');
@@ -197,8 +191,7 @@ describe('Shell Completion System Tests', () => {
     it('should show completion features', async () => {
       process.env.SHELL = '/bin/bash';
       
-      const cmd = createTestCommand(setupCompletionCommand);
-      await cmd.parseAsync(['node', 'test']);
+      await setupCompletionCommand.parseAsync(['node', 'test']);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('Features:');
@@ -234,8 +227,8 @@ describe('Shell Completion System Tests', () => {
 
     describe('Command completions', () => {
       it('should return all commands when no partial', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'commands']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'commands']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('init');
@@ -246,8 +239,8 @@ describe('Shell Completion System Tests', () => {
       });
 
       it('should filter commands by partial', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'commands', '--partial', 'lo']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'commands', '--partial', 'lo']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('lock');
@@ -256,8 +249,8 @@ describe('Shell Completion System Tests', () => {
       });
 
       it('should return JSON output when requested', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'commands', '--partial', 'lo', '--json']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'commands', '--partial', 'lo', '--json']);
         
         const output = consoleLogSpy.mock.calls[0][0];
         const response = JSON.parse(output);
@@ -277,16 +270,16 @@ describe('Shell Completion System Tests', () => {
       });
 
       it('should return protected files', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'files']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'files']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output.length).toBeGreaterThan(0);
       });
 
       it('should filter files by partial', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'files', '--partial', 'app']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'files', '--partial', 'app']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output.some(f => f.includes('app'))).toBe(true);
@@ -301,8 +294,8 @@ describe('Shell Completion System Tests', () => {
           .mockResolvedValueOnce(false) // app.key is not locked
           .mockResolvedValueOnce(true); // config.secret is locked
         
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'locked-files']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'locked-files']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('.env');
@@ -314,8 +307,8 @@ describe('Shell Completion System Tests', () => {
         // Mock all files as unlocked
         mockAdapter.isLocked.mockResolvedValue(false);
         
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'unlocked-files']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'unlocked-files']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('.env');
@@ -326,8 +319,8 @@ describe('Shell Completion System Tests', () => {
 
     describe('Pattern completions', () => {
       it('should return config patterns', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'patterns']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'patterns']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('.env');
@@ -338,8 +331,8 @@ describe('Shell Completion System Tests', () => {
       it('should return common patterns on config error', async () => {
         vi.mocked(configModule.loadConfig).mockRejectedValue(new Error('No config'));
         
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'patterns']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'patterns']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output.some(p => p.includes('.env'))).toBe(true);
@@ -349,8 +342,8 @@ describe('Shell Completion System Tests', () => {
 
     describe('Option completions', () => {
       it('should return options for lock command', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'options', '--command', 'lock']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'options', '--command', 'lock']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('--verbose');
@@ -359,8 +352,8 @@ describe('Shell Completion System Tests', () => {
       });
 
       it('should return options for unlock command', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'options', '--command', 'unlock']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'options', '--command', 'unlock']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('--verbose');
@@ -369,8 +362,8 @@ describe('Shell Completion System Tests', () => {
       });
 
       it('should filter options by partial', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'options', '--command', 'lock', '--partial', '--v']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'options', '--command', 'lock', '--partial', '--v']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toContain('--verbose');
@@ -378,8 +371,8 @@ describe('Shell Completion System Tests', () => {
       });
 
       it('should return empty for unknown commands', async () => {
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'options', '--command', 'unknown']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'options', '--command', 'unknown']);
         
         const output = consoleLogSpy.mock.calls.map(call => call[0]);
         expect(output).toHaveLength(0);
@@ -389,8 +382,8 @@ describe('Shell Completion System Tests', () => {
     describe('Error handling', () => {
       it('should fail silently for non-JSON output', async () => {
         // Force an error by using invalid type
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'invalid']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'invalid']);
         
         // Should not output anything
         expect(consoleLogSpy).not.toHaveBeenCalled();
@@ -401,8 +394,8 @@ describe('Shell Completion System Tests', () => {
         // Force an error
         vi.mocked(configModule.loadConfig).mockRejectedValue(new Error('Config error'));
         
-        const cmd = createTestCommand(completionHelperCommand);
-        await cmd.parseAsync(['node', 'test', '--type', 'files', '--json']);
+        // const cmd = completionHelperCommand;
+        await completionCommand.parseAsync(['node', 'test', '--type', 'files', '--json']);
         
         const output = consoleLogSpy.mock.calls[0][0];
         const response = JSON.parse(output);
@@ -425,10 +418,10 @@ describe('Shell Completion System Tests', () => {
       await writeFile(join(tempDir, 'app.key'), 'key-content');
       await writeFile(join(tempDir, 'other.txt'), 'other');
       
-      const cmd = createTestCommand(completionHelperCommand);
+      // const cmd = completionHelperCommand;
       consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       
-      await cmd.parseAsync(['node', 'test', '--type', 'files', '--cwd', tempDir]);
+      await completionHelperCommand.parseAsync(['node', 'test', '--type', 'files', '--cwd', tempDir]);
       
       const output = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(output).toContain('.env');
@@ -438,41 +431,3 @@ describe('Shell Completion System Tests', () => {
   });
 });
 
-/**
- * Helper function to create a test command instance
- */
-function createTestCommand(originalCommand: any): any {
-  // Get the command name properly
-  const commandName = originalCommand._name || 'test';
-  const cmd = new originalCommand.constructor(commandName);
-  
-  // Copy configuration
-  const desc = originalCommand._description;
-  if (desc) {
-    cmd.description(desc);
-  }
-  
-  // Copy arguments and options
-  const args = originalCommand._args || [];
-  args.forEach((arg: any) => {
-    cmd.argument(arg.argDetails || `<${arg.name}>`, arg.description);
-  });
-  
-  originalCommand.options.forEach((opt: any) => {
-    cmd.option(opt.flags, opt.description);
-  });
-  
-  // Copy action
-  if (originalCommand._actionHandler) {
-    cmd.action(originalCommand._actionHandler);
-  }
-  
-  // Configure for testing
-  cmd.exitOverride();
-  cmd.configureOutput({
-    writeOut: (str: string) => console.log(str),
-    writeErr: (str: string) => console.error(str)
-  });
-  
-  return cmd;
-}

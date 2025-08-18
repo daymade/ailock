@@ -49,12 +49,32 @@ export class FileDiagnostics {
     const stats = await stat(filePath);
     const mode = stats.mode;
     
+    // Check actual access permissions
+    let readable = false;
+    let writable = false;
+    let executable = false;
+    
+    try {
+      await access(filePath, constants.R_OK);
+      readable = true;
+    } catch {}
+    
+    try {
+      await access(filePath, constants.W_OK);
+      writable = true;
+    } catch {}
+    
+    try {
+      await access(filePath, constants.X_OK);
+      executable = true;
+    } catch {}
+    
     return {
       mode,
       octal: (mode & parseInt('777', 8)).toString(8).padStart(3, '0'),
-      readable: (mode & constants.R_OK) !== 0,
-      writable: (mode & constants.W_OK) !== 0,
-      executable: (mode & constants.X_OK) !== 0,
+      readable,
+      writable,
+      executable,
       owner: stats.uid.toString(),
       group: stats.gid.toString(),
       size: stats.size,

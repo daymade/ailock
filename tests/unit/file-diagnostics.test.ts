@@ -61,7 +61,7 @@ describe('FileDiagnostics Tests', () => {
       
       expect(permissions.octal).toBe('444');
       expect(permissions.readable).toBe(true);
-      expect(permissions.writable).toBe(true); // Process may still have write access
+      expect(permissions.writable).toBe(false); // File should not be writable with 444 permissions
     });
 
     it('should detect executable permissions', async () => {

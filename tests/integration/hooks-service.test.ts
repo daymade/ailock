@@ -37,8 +37,8 @@ describe('HooksService Integration', () => {
   });
 
   describe('findAilockInstallation', () => {
-    it('should find ailock installation', () => {
-      const result = service.findAilockInstallation();
+    it('should find ailock installation', async () => {
+      const result = await service.findAilockInstallation();
       
       // Should return some form of ailock command
       expect(result).toBeDefined();

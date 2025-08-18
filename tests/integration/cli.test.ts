@@ -34,7 +34,7 @@ describe('CLI Integration Tests', () => {
   it('should show version information', async () => {
     const { stdout } = await execAsync(`node "${cliPath}" --version`);
     
-    expect(stdout.trim()).toBe('1.5.0');
+    expect(stdout.trim()).toBe('1.5.4');
   });
 
   it('should lock and unlock files with configuration', async () => {

@@ -15,6 +15,10 @@ describe('gitignore integration simple test', () => {
     mkdirSync(TEST_DIR, { recursive: true });
     mkdirSync(PROJECT_DIR, { recursive: true });
     
+    // Initialize as a git repository
+    const { execSync } = require('child_process');
+    execSync('git init', { cwd: PROJECT_DIR });
+    
     // Create test files
     writeFileSync(path.join(PROJECT_DIR, '.env'), 'API_KEY=test-key');
     writeFileSync(path.join(PROJECT_DIR, '.gitignore'), '.env\n*.secret\nnode_modules/\n.vscode/');
@@ -32,9 +36,9 @@ describe('gitignore integration simple test', () => {
   });
 
   it('should load gitignore patterns correctly', async () => {
-    const config = await loadConfig(PROJECT_DIR, { includeGitignored: false });
+    const config = await loadConfig(PROJECT_DIR, { includeGitignored: true });
     
-    // Should include gitignore patterns by default
+    // Should include gitignore patterns when includeGitignored is true
     expect(config.patterns).toContain('.env');
     expect(config.patterns).toContain('*.secret');
     
@@ -44,13 +48,13 @@ describe('gitignore integration simple test', () => {
   });
 
   it('should exclude gitignore when requested', async () => {
-    const config = await loadConfig(PROJECT_DIR, { includeGitignored: true });
+    const config = await loadConfig(PROJECT_DIR, { includeGitignored: false });
     
     // Should only have .ailock patterns when gitignore is excluded
-    const nonAilockPatterns = config.patterns.filter(p => p !== '.env' && p !== '*.key');
+    expect(config.patterns).toContain('.env');
+    expect(config.patterns).toContain('*.key');
     
-    // With includeGitignored: true, should not include gitignore patterns
-    // (Note: this test may need adjustment based on actual implementation)
-    expect(nonAilockPatterns.length).toBeGreaterThanOrEqual(0);
+    // With includeGitignored: false, should not include gitignore-specific patterns
+    expect(config.patterns).not.toContain('*.secret');
   });
 });
