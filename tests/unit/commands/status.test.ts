@@ -11,6 +11,10 @@ describe('Status Command', () => {
     // Create a temporary directory for testing
     tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ailock-status-test-'));
     process.chdir(tempDir);
+    
+    // Initialize Git repository
+    const { execSync } = require('child_process');
+    execSync('git init', { cwd: tempDir });
   });
 
   afterEach(async () => {

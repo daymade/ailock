@@ -107,6 +107,11 @@ export const setupCompletionCommand = new Command('setup-completion')
   });
 
 function detectShell(): Shell | null {
+  // Check for PowerShell on Windows first
+  if (process.platform === 'win32' && process.env.PSModulePath) {
+    return 'powershell';
+  }
+  
   const shell = process.env.SHELL;
   
   if (!shell) return null;
@@ -114,11 +119,6 @@ function detectShell(): Shell | null {
   if (shell.includes('bash')) return 'bash';
   if (shell.includes('zsh')) return 'zsh';
   if (shell.includes('fish')) return 'fish';
-  
-  // Check for PowerShell on Windows
-  if (process.platform === 'win32' && process.env.PSModulePath) {
-    return 'powershell';
-  }
   
   return null;
 }
