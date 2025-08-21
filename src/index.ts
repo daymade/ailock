@@ -4,12 +4,11 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
-import { lockCommand } from './commands/lock.js';
+import { createLockCommand, createProtectCommand } from './commands/lock.js';
 import { unlockCommand } from './commands/unlock.js';
 import { statusCommand } from './commands/status.js';
 import { authCommand } from './commands/auth.js';
 import { quotaCommand } from './commands/quota.js';
-// Removed - duplicate functionality now in 'hooks' command
 import { preCommitCheckCommand } from './commands/pre-commit-check.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -17,7 +16,7 @@ import { generateCommand } from './commands/generate.js';
 import { diagnoseCommand } from './commands/diagnose.js';
 import { completionCommand, setupCompletionCommand } from './commands/completion.js';
 import { completionHelperCommand } from './commands/completion-helper.js';
-import { hooksCommand } from './commands/hooks.js';
+import { createHooksCommand } from './commands/hooks.js';
 import { createEditCommand } from './commands/edit.js';
 import { createEmergencyUnlockCommand } from './commands/emergency-unlock.js';
 import { createDoctorCommand } from './commands/doctor.js';
@@ -51,9 +50,8 @@ function handleSmartRouting() {
   // If first argument exists and is not a known command, check if it's a path
   const firstArg = args[0];
   const knownCommands = [
-    'init', 'lock', 'unlock', 'auth', 'quota', 'edit', 'emergency-unlock', 'doctor',
-    'status', 'status-interactive', 'dash',
-    'list', 'ls', 'generate', 'gen', 'hooks', 'diagnose', 'pre-commit-check',
+    'init', 'lock', 'unlock', 'protect', 'auth', 'quota', 'edit', 'emergency-unlock', 'doctor',
+    'status', 'list', 'generate', 'hooks', 'diagnose', 'pre-commit-check',
     'completion', 'setup-completion', 'completion-helper',
     '--help', '-h', '--version', '-V', 'help'
   ];
@@ -100,7 +98,8 @@ program
 
 // Add commands
 program.addCommand(initCommand);
-program.addCommand(lockCommand);
+program.addCommand(createLockCommand()); // Enhanced with auto-hook installation
+program.addCommand(createProtectCommand()); // Alias for complete protection
 program.addCommand(unlockCommand);
 program.addCommand(authCommand); // Auth code redemption for quota increase
 program.addCommand(quotaCommand); // Quota management and advanced features
@@ -109,13 +108,13 @@ program.addCommand(createEmergencyUnlockCommand()); // Emergency unlock for orph
 program.addCommand(statusCommand); // Includes interactive mode with --interactive
 program.addCommand(listCommand);
 program.addCommand(generateCommand);
-program.addCommand(hooksCommand); // Consolidated hook management
+program.addCommand(createHooksCommand()); // Unified hook management (replaces install-hooks)
 program.addCommand(createDoctorCommand()); // Health check and auto-fix
 program.addCommand(diagnoseCommand);
 program.addCommand(completionCommand);
 program.addCommand(setupCompletionCommand);
 
-// Hidden commands
+// Hidden commands (not shown in help)
 program.addCommand(preCommitCheckCommand);
 program.addCommand(completionHelperCommand);
 

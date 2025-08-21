@@ -3,18 +3,23 @@ import chalk from 'chalk';
 import { HooksService } from '../services/HooksService.js';
 
 /**
- * Create the hooks command with subcommands
+ * Create the unified hooks command (replaces install-hooks)
  * Follows Open/Closed Principle - easy to add new AI tools
  */
-export const hooksCommand = new Command('hooks')
-  .description('Manage AI tool and Git protection hooks')
-  .action(() => {
-    // Show help if no subcommand provided
-    hooksCommand.outputHelp();
-  });
+export function createHooksCommand(): Command {
+  const hooksCommand = new Command('hooks')
+    .description('Manage AI tool and Git protection hooks')
+    .action(() => {
+      // Show help if no subcommand provided
+      hooksCommand.outputHelp();
+    });
+  
+  return setupHooksSubcommands(hooksCommand);
+}
 
-// Initialize service (Dependency Injection would be better, but keeping it simple)
-const hooksService = new HooksService();
+function setupHooksSubcommands(hooksCommand: Command): Command {
+  // Initialize service (Dependency Injection would be better, but keeping it simple)
+  const hooksService = new HooksService();
 
 /**
  * Install subcommand
@@ -120,10 +125,63 @@ const listCommand = new Command('list')
   });
 
 /**
- * Git hooks subcommand (replaces old install-hooks command)
+ * Setup command - install all protection (replaces install-all)
+ */
+const setupCommand = new Command('setup')
+  .description('Install complete protection (Git + AI hooks)')
+  .option('-f, --force', 'Overwrite existing hooks')
+  .action(async (options: any) => {
+    try {
+      console.log(chalk.blue.bold('🛡️  Setting up complete protection...\n'));
+      
+      const installations: string[] = [];
+      
+      // Install Git hooks
+      try {
+        const { isGitRepository, installPreCommitHook, getRepoRoot } = await import('../core/git.js');
+        const isGitRepo = await isGitRepository();
+        if (isGitRepo) {
+          const repoRoot = await getRepoRoot();
+          if (repoRoot) {
+            await installPreCommitHook(repoRoot, options.force);
+            installations.push('Git protection');
+          }
+        }
+      } catch (error) {
+        console.log(chalk.yellow('⚠️  Git hooks failed:', error instanceof Error ? error.message : String(error)));
+      }
+      
+      // Install Claude hooks
+      try {
+        const claudeInfo = hooksService.detectClaudeCode();
+        if (claudeInfo.detected) {
+          const status = await hooksService.getHookStatus('claude');
+          if (!status.installed || options.force) {
+            await hooksService.installClaudeHooks(claudeInfo);
+            installations.push('AI protection');
+          }
+        }
+      } catch (error) {
+        console.log(chalk.yellow('⚠️  AI hooks failed:', error instanceof Error ? error.message : String(error)));
+      }
+      
+      if (installations.length > 0) {
+        console.log(chalk.green(`✅ Installed: ${installations.join(', ')}`));
+        console.log(chalk.blue('\n🎉 Complete protection is now active!'));
+      } else {
+        console.log(chalk.yellow('⚠️  No hooks were installed'));
+      }
+    } catch (error) {
+      console.error(chalk.red('❌ Setup failed:'), error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+/**
+ * Git hooks subcommand (for specific Git-only installation)
  */
 const gitCommand = new Command('git')
-  .description('Install Git pre-commit hooks')
+  .description('Install Git pre-commit hooks only')
   .option('-f, --force', 'Overwrite existing hooks')
   .action(async (options: any) => {
     try {
@@ -134,6 +192,7 @@ const gitCommand = new Command('git')
       if (!isGitRepo) {
         console.log(chalk.yellow('⚠️  Not a Git repository'));
         console.log(chalk.gray('Git hooks can only be installed in Git repositories'));
+        console.log(chalk.blue('💡 Use: ailock hooks install-all (for complete protection)'));
         process.exit(1);
       }
       
@@ -146,48 +205,30 @@ const gitCommand = new Command('git')
       
       console.log(chalk.green('✅ Git pre-commit hooks installed successfully'));
       console.log(chalk.gray('Your locked files are now protected from accidental commits'));
+      console.log(chalk.blue('💡 Run: ailock hooks install claude (for AI protection)'));
     } catch (error) {
       console.error(chalk.red('❌ Failed to install Git hooks:'), error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   });
 
-/**
- * Claude-specific shortcut command
- */
-const claudeCommand = new Command('claude')
-  .description('Quick setup for Claude Code hooks')
-  .option('-u, --uninstall', 'Uninstall Claude Code hooks')
-  .option('-s, --status', 'Check Claude Code hook status')
-  .action(async (options: any) => {
-    try {
-      if (options.uninstall) {
-        await uninstallClaudeHooks();
-      } else if (options.status) {
-        const status = await hooksService.getHookStatus('claude');
-        displayClaudeStatus(status);
-      } else {
-        await installClaudeHooks({});
-      }
-    } catch (error) {
-      console.error(chalk.red('❌ Operation failed:'), error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    }
-  });
 
-// Add subcommands to main hooks command
-hooksCommand.addCommand(installCommand);
-hooksCommand.addCommand(uninstallCommand);
-hooksCommand.addCommand(statusCommand);
-hooksCommand.addCommand(listCommand);
-hooksCommand.addCommand(gitCommand);
-hooksCommand.addCommand(claudeCommand);
+  // Add subcommands to main hooks command  
+  hooksCommand.addCommand(setupCommand);     // Primary: complete setup
+  hooksCommand.addCommand(installCommand);   // Install specific tools
+  hooksCommand.addCommand(uninstallCommand); // Remove hooks
+  hooksCommand.addCommand(statusCommand);    // Check status
+  hooksCommand.addCommand(gitCommand);       // Git-only installation
+  
+  return hooksCommand;
+}
 
 /**
  * Install Claude Code hooks
  * DRY - shared by multiple commands
  */
 async function installClaudeHooks(options: any): Promise<void> {
+  const hooksService = new HooksService();
   const claudeInfo = hooksService.detectClaudeCode();
   
   if (!claudeInfo.detected) {
@@ -226,6 +267,7 @@ async function installClaudeHooks(options: any): Promise<void> {
  * DRY - shared by multiple commands
  */
 async function uninstallClaudeHooks(): Promise<void> {
+  const hooksService = new HooksService();
   const claudeInfo = hooksService.detectClaudeCode();
   
   if (!claudeInfo.detected) {
@@ -245,28 +287,3 @@ async function uninstallClaudeHooks(): Promise<void> {
   console.log(chalk.gray('AI tools can now modify all files again'));
 }
 
-/**
- * Display Claude Code status
- * DRY - shared display logic
- */
-function displayClaudeStatus(status: any): void {
-  console.log(chalk.blue.bold('🔍 Claude Code Hook Status\n'));
-  
-  if (status.error) {
-    console.log(chalk.yellow(status.error));
-  } else if (status.installed) {
-    console.log(chalk.green('✅ Hooks installed'));
-    if (status.location) {
-      console.log(chalk.gray(`📍 Location: ${status.location}`));
-    }
-    if (status.hookCount !== undefined) {
-      console.log(chalk.gray(`🔗 Active hooks: ${status.hookCount}`));
-    }
-  } else {
-    console.log(chalk.yellow('❌ Hooks not installed'));
-    if (status.location) {
-      console.log(chalk.gray(`📍 Would install to: ${status.location}`));
-    }
-    console.log(chalk.gray('\n💡 Run: ailock hooks install claude'));
-  }
-}

@@ -20,7 +20,7 @@ _ailock() {
         'list:List protected files (alias: ls)'
         'diagnose:Diagnose file protection issues'
         'generate:Generate CI/CD and container configs'
-        'install-hooks:Install Git pre-commit hooks'
+        'protect:Complete file protection (lock + hooks)'
         'completion:Generate shell completion script'
         'setup-completion:Interactive completion setup'
         'help:Show help information'
@@ -98,11 +98,6 @@ _ailock() {
                     _describe -t templates 'template' templates
                     ;;
                     
-                install-hooks)
-                    _arguments \\
-                        '--force[Force overwrite existing hooks]' \\
-                        '--yes[Skip confirmation prompts]'
-                    ;;
                     
                 completion)
                     local -a shells

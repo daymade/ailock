@@ -18,7 +18,7 @@ Register-ArgumentCompleter -Native -CommandName 'ailock','aiunlock' -ScriptBlock
         'ls' = 'List protected files (alias)'
         'diagnose' = 'Diagnose file protection issues'
         'generate' = 'Generate CI/CD and container configs'
-        'install-hooks' = 'Install Git pre-commit hooks'
+        'protect' = 'Complete file protection (lock + hooks)'
         'completion' = 'Generate shell completion script'
         'setup-completion' = 'Interactive completion setup'
         'help' = 'Show help information'
@@ -33,7 +33,6 @@ Register-ArgumentCompleter -Native -CommandName 'ailock','aiunlock' -ScriptBlock
         'ls' = @('--all', '--long', '--locked-only', '--unlocked-only', '--json')
         'diagnose' = @('--verbose')
         'generate' = @('github', 'gitlab', 'bitbucket', 'jenkins', 'circleci', 'docker', 'devcontainer')
-        'install-hooks' = @('--force', '--yes')
         'completion' = @('bash', 'zsh', 'fish', 'powershell')
     }
     

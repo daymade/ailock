@@ -44,7 +44,7 @@ complete -c ailock -n __ailock_needs_command -a list -d "List protected files"
 complete -c ailock -n __ailock_needs_command -a ls -d "List protected files (alias)"
 complete -c ailock -n __ailock_needs_command -a diagnose -d "Diagnose file protection issues"
 complete -c ailock -n __ailock_needs_command -a generate -d "Generate CI/CD and container configs"
-complete -c ailock -n __ailock_needs_command -a install-hooks -d "Install Git pre-commit hooks"
+complete -c ailock -n __ailock_needs_command -a protect -d "Complete file protection (lock + hooks)"
 complete -c ailock -n __ailock_needs_command -a completion -d "Generate shell completion script"
 complete -c ailock -n __ailock_needs_command -a setup-completion -d "Interactive completion setup"
 complete -c ailock -n __ailock_needs_command -a help -d "Show help information"
@@ -98,9 +98,6 @@ complete -c ailock -n "__ailock_using_command generate" -a circleci -d "CircleCI
 complete -c ailock -n "__ailock_using_command generate" -a docker -d "Dockerfile"
 complete -c ailock -n "__ailock_using_command generate" -a devcontainer -d "VS Code devcontainer"
 
-# install-hooks command options
-complete -c ailock -n "__ailock_using_command install-hooks" -l force -d "Force overwrite existing hooks"
-complete -c ailock -n "__ailock_using_command install-hooks" -l yes -d "Skip confirmation prompts"
 
 # completion command shells
 complete -c ailock -n "__ailock_using_command completion" -a bash -d "Bash shell"

@@ -109,7 +109,7 @@ async function showDetailedStatus(status: RepoStatus): Promise<void> {
     if (status.hasAilockHook) {
       console.log(`${chalk.green('●')} Pre-commit Hook ${chalk.gray('installed')}`);
     } else {
-      console.log(`${chalk.yellow('⚠')} Pre-commit Hook ${chalk.yellow('missing')} ${chalk.gray('← run: ailock install-hooks')}`);
+      console.log(`${chalk.yellow('⚠')} Pre-commit Hook ${chalk.yellow('missing')} ${chalk.gray('← run: ailock hooks git')}`);
     }
   } else {
     console.log(`${chalk.gray('○')} Git Repository ${chalk.gray('not detected')}`);
@@ -190,7 +190,7 @@ async function showDetailedStatus(status: RepoStatus): Promise<void> {
     // Priority 2: System setup
     if (!status.hasAilockHook && status.isGitRepo) {
       const step = unlockedCount > 0 ? '2.' : '1.';
-      console.log(`${chalk.yellow.bold(step)} ${chalk.white('ailock install-hooks')} ${chalk.gray('← Enable Git protection')}`);
+      console.log(`${chalk.yellow.bold(step)} ${chalk.white('ailock hooks git')} ${chalk.gray('← Enable Git protection')}`);
     }
     
     // Priority 3: Getting started (if nothing protected)
@@ -215,7 +215,7 @@ async function showDetailedStatus(status: RepoStatus): Promise<void> {
       console.log(`${chalk.yellow.bold('1.')} ${chalk.white('ailock lock')} ${chalk.gray('← Protect vulnerable files')}`);
     }
     if (!status.hasAilockHook && status.isGitRepo) {
-      console.log(`${chalk.yellow.bold('2.')} ${chalk.white('ailock install-hooks')} ${chalk.gray('← Enable Git protection')}`);
+      console.log(`${chalk.yellow.bold('2.')} ${chalk.white('ailock hooks git')} ${chalk.gray('← Enable Git protection')}`);
     }
     if (totalProtected === 0) {
       console.log(`${chalk.cyan.bold('1.')} ${chalk.white('ailock lock <file>')} ${chalk.gray('← Start protecting files')}`);
@@ -226,7 +226,6 @@ async function showDetailedStatus(status: RepoStatus): Promise<void> {
 }
 
 export const statusCommand = new Command('status')
-  .alias('dash')
   .description('Show current ailock protection status')
   .option('-i, --interactive', 'Show interactive status dashboard with real-time updates')
   .option('-v, --verbose', 'Show detailed information')

@@ -83,13 +83,12 @@ function getCommandCompletions(partial: string): string[] {
     'init',
     'lock',
     'unlock',
+    'protect',
     'status',
-    'status-interactive',
     'list',
-    'ls',
     'diagnose',
     'generate',
-    'install-hooks',
+    'hooks',
     'completion',
     'help'
   ];
@@ -196,13 +195,14 @@ async function getPatternCompletions(partial: string, cwd: string): Promise<stri
 function getOptionCompletions(command: string, partial: string): string[] {
   const optionsByCommand: Record<string, string[]> = {
     init: ['--force', '--interactive', '--config-only'],
-    lock: ['--verbose', '--dry-run', '--no-gitignore'],
+    lock: ['--verbose', '--dry-run', '--no-gitignore', '--no-hooks', '--hooks-only'],
     unlock: ['--verbose', '--dry-run', '--all', '--no-gitignore'],
-    status: ['--verbose', '--simple', '--json'],
-    list: ['--all', '--long', '--locked-only', '--unlocked-only', '--json'],
+    protect: ['--verbose', '--dry-run', '--no-gitignore'],
+    status: ['--verbose', '--simple', '--json', '--interactive'],
+    list: ['--long', '--locked-only', '--json'],
     diagnose: ['--verbose'],
-    'install-hooks': ['--force', '--yes'],
-    generate: ['github', 'gitlab', 'bitbucket', 'jenkins', 'circleci', 'docker', 'devcontainer']
+    generate: ['--template', '--category', '--list', '--force', '--dry-run'],
+    hooks: ['setup', 'install', 'uninstall', 'status', 'git']
   };
   
   const options = optionsByCommand[command] || [];

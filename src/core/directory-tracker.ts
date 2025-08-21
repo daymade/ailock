@@ -478,6 +478,30 @@ export async function getProjectQuotaStatusSummary(): Promise<string> {
 }
 
 /**
+ * Get all individually tracked locked files (for status reporting)
+ * This fixes the bug where status shows 0 files for individually locked files
+ */
+export async function getTrackedLockedFiles(): Promise<string[]> {
+  try {
+    const projects = await getProtectedProjects();
+    
+    const allTrackedFiles: string[] = [];
+    
+    // Get files from all protected projects
+    for (const project of projects) {
+      if (project.protectedPaths) {
+        allTrackedFiles.push(...project.protectedPaths);
+      }
+    }
+    
+    return [...new Set(allTrackedFiles)]; // Remove duplicates
+  } catch (error) {
+    // If we can't load config, return empty array
+    return [];
+  }
+}
+
+/**
  * Reset directory tracking (useful for testing)
  */
 export async function resetDirectoryTracking(): Promise<void> {

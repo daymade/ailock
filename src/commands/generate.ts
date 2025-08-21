@@ -101,7 +101,6 @@ const TEMPLATES: Template[] = [
 ];
 
 export const generateCommand = new Command('generate')
-  .alias('gen')
   .description('Generate integration templates for CI/CD, Docker, and development environments')
   .option('-t, --template <name>', 'Generate specific template by name')
   .option('-c, --category <category>', 'Generate all templates in category (ci-cd, docker, devcontainer)')

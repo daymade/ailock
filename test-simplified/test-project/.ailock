@@ -1,0 +1,14 @@
+# AI-Proof File Guard Configuration
+# Generated for: Node.js project
+# Protects sensitive files from accidental AI modifications
+
+.env
+.env.*
+!.env.example
+config/*.json
+config/*.yaml
+**/*.key
+**/*.pem
+**/secrets.json
+
+# Add your own patterns below:

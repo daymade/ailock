@@ -20,7 +20,7 @@ _ailock_completion() {
         cword=\$COMP_CWORD
     fi
 
-    local commands="init lock unlock status status-interactive list ls diagnose generate install-hooks completion setup-completion help"
+    local commands="init lock unlock status status-interactive protect list ls diagnose generate hooks completion setup-completion help"
     
     # Main command completion
     if [[ $cword -eq 1 ]]; then
@@ -121,9 +121,6 @@ _ailock_completion() {
             esac
             ;;
             
-        install-hooks)
-            COMPREPLY=($(compgen -W "--force --yes" -- "$cur"))
-            ;;
             
         completion)
             case "$prev" in

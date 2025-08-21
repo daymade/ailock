@@ -143,14 +143,23 @@ export async function getRepoStatus(cwd?: string): Promise<RepoStatus> {
   }
   
   const hookInfo = getHookInfo(repoRoot);
-  const config = await loadConfig(workingDir);
-  const protectedFiles = await findProtectedFiles(config);
   
-  // Check which protected files are currently locked
+  // Get files from config AND individually tracked files
+  const config = await loadConfig(workingDir);
+  const configFiles = await findProtectedFiles(config);
+  
+  // Import directory tracker to get individually locked files
+  const { getTrackedLockedFiles } = await import('./directory-tracker.js');
+  const trackedFiles = await getTrackedLockedFiles();
+  
+  // Combine and deduplicate
+  const allProtectedFiles = [...new Set([...configFiles, ...trackedFiles])];
+  
+  // Check which files are currently locked
   const adapter = getPlatformAdapter();
   const lockedFiles: string[] = [];
   
-  for (const file of protectedFiles) {
+  for (const file of allProtectedFiles) {
     try {
       const isLocked = await adapter.isLocked(file);
       if (isLocked) {
@@ -165,7 +174,7 @@ export async function getRepoStatus(cwd?: string): Promise<RepoStatus> {
     isGitRepo: true,
     hasAilockHook: hookInfo.isAilockManaged,
     hookInfo,
-    protectedFiles,
+    protectedFiles: allProtectedFiles,
     lockedFiles
   };
 }

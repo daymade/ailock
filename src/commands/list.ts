@@ -6,12 +6,9 @@ import { getPlatformAdapter } from '../core/platform.js';
 import { getRepoStatus } from '../core/git.js';
 
 export const listCommand = new Command('list')
-  .alias('ls')
   .description('List all protected files and their current status')
-  .option('-a, --all', 'Show all files, including those not currently protected')
   .option('-l, --long', 'Show detailed information for each file')
   .option('--locked-only', 'Show only locked files')
-  .option('--unlocked-only', 'Show only unlocked files')
   .option('--json', 'Output as JSON')
   .action(async (options) => {
     try {
