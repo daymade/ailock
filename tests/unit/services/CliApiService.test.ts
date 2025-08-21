@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
 import { CliApiService, getApiService, createApiService } from '../../../src/services/CliApiService.js';
 
-// Mock node-fetch at the top level
+// Mock global fetch
 const mockFetch = vi.fn();
-vi.mock('node-fetch', () => ({
-  default: mockFetch
-}));
 
 // Mock dependencies
 vi.mock('../../../src/core/user-config.js', () => ({
@@ -28,8 +25,9 @@ describe('CliApiService', () => {
   let apiService: CliApiService;
 
   beforeEach(() => {
-    // Reset the mock
+    // Reset the mock and stub global fetch
     mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
     
     apiService = new CliApiService({
       baseUrl: 'https://test-api.example.com',
@@ -46,6 +44,7 @@ describe('CliApiService', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
     vi.resetModules();
   });
 

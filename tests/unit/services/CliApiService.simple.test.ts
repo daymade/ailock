@@ -28,7 +28,6 @@ describe('CliApiService - Core Functionality', () => {
       getMachineUuid: vi.fn().mockResolvedValue('test-uuid'),
       sanitizeForLogging: vi.fn().mockImplementation((str) => str)
     }));
-    vi.doMock('node-fetch', () => ({ default: mockFetch }));
 
     // Import after mocking
     const module = await import('../../../src/services/CliApiService.js');

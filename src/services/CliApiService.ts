@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { loadUserConfig, saveUserConfig, getOfflineMode, shouldCollectAnalytics } from '../core/user-config.js';
 import { getMachineUuid, sanitizeForLogging } from '../core/machine-id.js';
 
