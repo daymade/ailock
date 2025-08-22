@@ -1,6 +1,6 @@
 {
   "name": "ailock",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "AI-Proof File Guard - Protect sensitive files from accidental AI modifications",
   "main": "./dist/index.js",
   "type": "module",
