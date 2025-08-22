@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { existsSync } from 'fs';
+import { resolve } from 'path';
 import chalk from 'chalk';
 import { getPlatformAdapter } from '../core/platform.js';
 import { SecurePathValidator } from '../security/PathValidator.js';
@@ -50,7 +51,7 @@ async function executeEmergencyUnlock(files: string[], options: EmergencyUnlockO
     console.log(chalk.gray('💡 Or:    ailock emergency-unlock --all'));
     process.exit(1);
   } else {
-    targetFiles = files.map(f => require('path').resolve(f));
+    targetFiles = files.map(f => resolve(f));
   }
 
   if (targetFiles.length === 0) {

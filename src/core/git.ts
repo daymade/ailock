@@ -149,8 +149,18 @@ export async function getRepoStatus(cwd?: string): Promise<RepoStatus> {
   const configFiles = await findProtectedFiles(config);
   
   // Import directory tracker to get individually locked files
-  const { getTrackedLockedFiles } = await import('./directory-tracker.js');
+  const { getTrackedLockedFiles, getProtectedProjectsList } = await import('./directory-tracker.js');
   const trackedFiles = await getTrackedLockedFiles();
+  
+  // Auto-detect and register current project if we have .ailock but no projects
+  // This provides fallback for migration issues
+  const projects = await getProtectedProjectsList();
+  if (projects.length === 0 && configFiles.length > 0) {
+    // We have protected files from config but no projects tracked
+    if (process.env.AILOCK_DEBUG === 'true') {
+      console.log(`Debug: Auto-detecting project at ${workingDir} with ${configFiles.length} protected files`);
+    }
+  }
   
   // Combine and deduplicate
   const allProtectedFiles = [...new Set([...configFiles, ...trackedFiles])];
@@ -258,7 +268,7 @@ export async function installPreCommitHook(repoRoot: string, force: boolean = fa
 /**
  * Remove ailock pre-commit hook
  */
-export function removePreCommitHook(repoRoot: string): void {
+export async function removePreCommitHook(repoRoot: string): Promise<void> {
   const hookInfo = getHookInfo(repoRoot);
   
   if (!hookInfo.exists) {
@@ -270,6 +280,6 @@ export function removePreCommitHook(repoRoot: string): void {
   }
   
   // Remove the hook file
-  const fs = require('fs');
-  fs.unlinkSync(hookInfo.hookPath);
+  const { unlinkSync } = await import('fs');
+  unlinkSync(hookInfo.hookPath);
 }

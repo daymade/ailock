@@ -90,7 +90,7 @@ export async function loadUserConfig(): Promise<UserConfig> {
       const config = JSON.parse(configContent) as UserConfig;
       
       // Merge with defaults to handle version upgrades
-      const mergedConfig = { ...DEFAULT_USER_CONFIG, ...config };
+      let mergedConfig = { ...DEFAULT_USER_CONFIG, ...config };
       
       // Convert date strings back to Date objects
       if (config.lastSyncAt && typeof config.lastSyncAt === 'string') {
@@ -102,7 +102,11 @@ export async function loadUserConfig(): Promise<UserConfig> {
       const hasLegacyData = config.lockedDirectories && config.lockedDirectories.length > 0;
       
       if (needsMigration && hasLegacyData) {
-        await migrateLegacyDirectoriesToProjects(mergedConfig);
+        mergedConfig = await migrateLegacyDirectoriesToProjects(mergedConfig);
+        // Clear legacy data after successful migration
+        mergedConfig.lockedDirectories = [];
+        // Save migrated config to disk
+        await saveUserConfig(mergedConfig);
       }
 
       // Handle date conversion for projects
@@ -889,8 +893,17 @@ export async function migrateLegacyDirectoriesToProjects(config: UserConfig): Pr
           relativePath = basename(filePath);
         }
       } else {
-        // If path doesn't exist, assume it's a file and get parent directory
-        targetPath = dirname(filePath);
+        // If path doesn't exist, check if parent directory exists
+        const parentDir = dirname(filePath);
+        if (!existsSync(parentDir)) {
+          // Skip paths that don't exist and whose parent directories don't exist
+          if (process.env.AILOCK_DEBUG === 'true') {
+            console.log(`Debug: Skipping non-existent path during migration: ${filePath}`);
+          }
+          continue;
+        }
+        // If parent exists, assume it's a file and get parent directory
+        targetPath = parentDir;
         relativePath = basename(filePath);
       }
       

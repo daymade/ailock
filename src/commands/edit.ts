@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { existsSync } from 'fs';
+import { resolve } from 'path';
 import { spawn } from 'child_process';
 import chalk from 'chalk';
 import { FileOperationService } from '../services/FileOperationService.js';
@@ -36,7 +37,7 @@ export function createEditCommand(): Command {
 
 async function executeEdit(filePath: string, options: EditOptions): Promise<void> {
   const service = new FileOperationService();
-  const absolutePath = require('path').resolve(filePath);
+  const absolutePath = resolve(filePath);
 
   // Validate file exists
   if (!existsSync(absolutePath)) {

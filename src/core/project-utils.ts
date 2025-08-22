@@ -1,5 +1,6 @@
-import { resolve, basename, dirname } from 'path';
-import { existsSync } from 'fs';
+import { resolve, basename, dirname, relative } from 'path';
+import { existsSync, statSync } from 'fs';
+import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import { getRepoRoot } from './git.js';
 import { gitRepoCache } from './git-cache.js';
@@ -42,8 +43,8 @@ export function generateProjectName(rootPath: string, type: ProjectType): string
   }
   
   // Home directory detection
-  const homedir = require('os').homedir();
-  if (homedir && rootPath === homedir) {
+  const homeDir = homedir();
+  if (homeDir && rootPath === homeDir) {
     return 'home';
   }
   
@@ -76,7 +77,7 @@ export async function createProjectFromPath(
   
   // Check if this is a file or directory
   const isDirectory = existsSync(normalizedPath) && 
-    require('fs').statSync(normalizedPath).isDirectory();
+    statSync(normalizedPath).isDirectory();
   
   // Try to detect if this is part of a Git repository
   const gitInfo = await detectGitRepository(normalizedPath);
@@ -90,7 +91,7 @@ export async function createProjectFromPath(
     type = 'git';
     // Calculate relative path from repo root
     relativePath = isDirectory ? '.' : 
-      require('path').relative(gitInfo.repoRoot, normalizedPath);
+      relative(gitInfo.repoRoot, normalizedPath);
   } else {
     // For non-git paths
     if (isDirectory) {
@@ -139,7 +140,7 @@ export async function findProjectRoot(filePath: string): Promise<string> {
   
   // Check if this is a directory
   const isDirectory = existsSync(normalizedPath) && 
-    require('fs').statSync(normalizedPath).isDirectory();
+    statSync(normalizedPath).isDirectory();
   
   // Try to detect Git repository
   const gitInfo = await detectGitRepository(normalizedPath);
@@ -288,10 +289,10 @@ export function consolidateProjects(projects: ProjectUnit[]): ProjectUnit[] {
  * Generate a user-friendly project display path
  */
 export function getProjectDisplayPath(projectPath: string): string {
-  const homedir = require('os').homedir();
+  const homeDir = homedir();
   
-  if (homedir && projectPath.startsWith(homedir)) {
-    return projectPath.replace(homedir, '~');
+  if (homeDir && projectPath.startsWith(homeDir)) {
+    return projectPath.replace(homeDir, '~');
   }
   
   return projectPath;

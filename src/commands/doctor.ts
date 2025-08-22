@@ -1,9 +1,10 @@
 import { Command } from 'commander';
-import { existsSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync, accessSync, constants } from 'fs';
 import chalk from 'chalk';
 import { getPlatformAdapter } from '../core/platform.js';
 import { getRepoStatus } from '../core/git.js';
 import { loadConfig, findProtectedFiles } from '../core/config.js';
+import { loadUserConfig, saveUserConfig } from '../core/user-config.js';
 
 interface DoctorOptions {
   fix?: boolean;
@@ -68,7 +69,110 @@ async function executeDiagnosis(options: DoctorOptions): Promise<void> {
     });
   }
 
-  // Check 2: Protected files status
+  // Check 2: User configuration integrity
+  console.log(chalk.blue('⚙️  Checking user configuration...'));
+  try {
+    const userConfig = await loadUserConfig();
+    let invalidPaths: string[] = [];
+    
+    // Check for invalid legacy paths
+    if (userConfig.lockedDirectories && userConfig.lockedDirectories.length > 0) {
+      for (const path of userConfig.lockedDirectories) {
+        if (!existsSync(path)) {
+          invalidPaths.push(path);
+          if (options.verbose) {
+            console.log(chalk.yellow(`  ⚠️  Invalid legacy path: ${path}`));
+          }
+        }
+      }
+      
+      if (invalidPaths.length > 0) {
+        issues.push({
+          type: 'warning',
+          category: 'User Config',
+          message: `Found ${invalidPaths.length} invalid path(s) in legacy configuration`,
+          fix: async () => {
+            console.log(chalk.blue('  🔧 Cleaning invalid paths from configuration...'));
+            const config = await loadUserConfig();
+            
+            // Filter out invalid paths
+            if (config.lockedDirectories) {
+              config.lockedDirectories = config.lockedDirectories.filter(path => existsSync(path));
+            }
+            
+            // Force migration again if needed
+            if (config.lockedDirectories && config.lockedDirectories.length > 0) {
+              const { migrateLegacyDirectoriesToProjects } = await import('../core/user-config.js');
+              const migrated = await migrateLegacyDirectoriesToProjects(config);
+              migrated.lockedDirectories = [];
+              await saveUserConfig(migrated);
+              console.log(chalk.green('  ✅ Configuration cleaned and migrated to project-based tracking'));
+            } else {
+              await saveUserConfig(config);
+              console.log(chalk.green('  ✅ Invalid paths removed from configuration'));
+            }
+          }
+        });
+      } else if (userConfig.lockedDirectories.length > 0) {
+        // Has legacy data but all paths are valid
+        issues.push({
+          type: 'info',
+          category: 'User Config',
+          message: 'Legacy configuration detected but all paths are valid',
+          fix: async () => {
+            console.log(chalk.blue('  🔧 Migrating to project-based tracking...'));
+            const config = await loadUserConfig();
+            const { migrateLegacyDirectoriesToProjects } = await import('../core/user-config.js');
+            const migrated = await migrateLegacyDirectoriesToProjects(config);
+            migrated.lockedDirectories = [];
+            await saveUserConfig(migrated);
+            console.log(chalk.green('  ✅ Successfully migrated to project-based tracking'));
+          }
+        });
+      }
+    }
+    
+    // Check project tracking
+    if (userConfig.protectedProjects) {
+      let invalidProjects = 0;
+      for (const project of userConfig.protectedProjects) {
+        if (!existsSync(project.rootPath)) {
+          invalidProjects++;
+          if (options.verbose) {
+            console.log(chalk.yellow(`  ⚠️  Invalid project path: ${project.rootPath}`));
+          }
+        }
+      }
+      
+      if (invalidProjects > 0) {
+        issues.push({
+          type: 'warning',
+          category: 'User Config',
+          message: `Found ${invalidProjects} invalid project(s) in configuration`,
+          fix: async () => {
+            console.log(chalk.blue('  🔧 Removing invalid projects from configuration...'));
+            const config = await loadUserConfig();
+            
+            if (config.protectedProjects) {
+              config.protectedProjects = config.protectedProjects.filter(p => existsSync(p.rootPath));
+              await saveUserConfig(config);
+              console.log(chalk.green('  ✅ Invalid projects removed from configuration'));
+            }
+          }
+        });
+      }
+    }
+    
+    console.log(chalk.green('  ✅ User configuration check complete'));
+  } catch (error) {
+    issues.push({
+      type: 'error',
+      category: 'User Config',
+      message: `Cannot check user configuration: ${error}`
+    });
+  }
+
+  // Check 3: Protected files status
   console.log(chalk.blue('🔒 Checking protected files...'));
   try {
     const config = await loadConfig();
@@ -142,7 +246,7 @@ async function executeDiagnosis(options: DoctorOptions): Promise<void> {
     });
   }
 
-  // Check 3: Git integration
+  // Check 4: Git integration
   console.log(chalk.blue('🔧 Checking Git integration...'));
   try {
     const repoStatus = await getRepoStatus();
@@ -179,7 +283,7 @@ async function executeDiagnosis(options: DoctorOptions): Promise<void> {
     });
   }
 
-  // Check 4: Platform capabilities
+  // Check 5: Platform capabilities
   console.log(chalk.blue('🖥️  Checking platform capabilities...'));
   try {
     const { detectPlatform } = await import('../core/platform.js');
@@ -188,7 +292,7 @@ async function executeDiagnosis(options: DoctorOptions): Promise<void> {
     
     // Test basic locking capability
     const testFile = '/tmp/ailock-doctor-test-' + Date.now();
-    require('fs').writeFileSync(testFile, 'test');
+    writeFileSync(testFile, 'test');
     
     try {
       await adapter.lockFile(testFile);
@@ -202,7 +306,7 @@ async function executeDiagnosis(options: DoctorOptions): Promise<void> {
       });
     } finally {
       try {
-        require('fs').unlinkSync(testFile);
+        unlinkSync(testFile);
       } catch {
         // Ignore cleanup errors
       }
@@ -278,7 +382,7 @@ async function executeDiagnosis(options: DoctorOptions): Promise<void> {
 
 async function canAccessFile(filePath: string): Promise<boolean> {
   try {
-    require('fs').accessSync(filePath, require('fs').constants.R_OK);
+    accessSync(filePath, constants.R_OK);
     return true;
   } catch {
     return false;

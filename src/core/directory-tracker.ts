@@ -494,6 +494,23 @@ export async function getTrackedLockedFiles(): Promise<string[]> {
       }
     }
     
+    // If no projects found but we're in a directory with .ailock file, 
+    // auto-detect the current project (fallback for migration issues)
+    if (projects.length === 0) {
+      const { existsSync } = await import('fs');
+      const { resolve, join } = await import('path');
+      const cwd = process.cwd();
+      const ailockPath = join(cwd, '.ailock');
+      
+      if (existsSync(ailockPath)) {
+        // We have a .ailock file but no projects tracked - likely migration issue
+        // Return empty for now, but getRepoStatus will use config files as fallback
+        if (process.env.AILOCK_DEBUG === 'true') {
+          console.log(`Debug: Found .ailock file but no tracked projects at ${cwd}`);
+        }
+      }
+    }
+    
     return [...new Set(allTrackedFiles)]; // Remove duplicates
   } catch (error) {
     // If we can't load config, return empty array

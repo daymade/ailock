@@ -356,6 +356,36 @@ describe('user-config migration', () => {
       expect(migrated.protectedProjects[0].rootPath).toBe(validDir);
     });
 
+    it('should skip non-existent paths during migration', async () => {
+      // Create only one valid directory
+      const validDir = path.join(testDir, 'valid-project');
+      await fs.promises.mkdir(validDir, { recursive: true });
+      await fs.promises.writeFile(path.join(validDir, 'file.txt'), 'content');
+
+      const legacyConfig: UserConfig = {
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        directoryQuota: 5,
+        lockedDirectories: [
+          '/home/user/project/file1.txt',  // Non-existent path
+          '/home/user/project/file2.txt',  // Non-existent path  
+          '/invalid/path/that/does/not/exist',  // Non-existent path
+          path.join(validDir, 'file.txt')  // Valid path
+        ],
+        protectedProjects: [],
+        projectQuota: 5
+      };
+
+      const migrated = fromActualConfig(await migrateLegacyDirectoriesToProjects(toActualConfig(legacyConfig)));
+
+      // Should only migrate the valid path
+      expect(migrated.version).toBe('2');
+      expect(migrated.protectedProjects).toHaveLength(1);
+      expect(migrated.protectedProjects[0].rootPath).toBe(validDir);
+      expect(migrated.protectedProjects[0].protectedPaths).toContain('file.txt');
+    });
+
     it('should consolidate duplicate projects after migration', async () => {
       // Create a real project directory
       const projectDir = path.join(testDir, 'project');

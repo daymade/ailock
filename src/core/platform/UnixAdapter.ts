@@ -1,6 +1,7 @@
 import { Platform } from '../platform.js';
 import { BasePlatformAdapter } from './BasePlatformAdapter.js';
 import path from 'path';
+import { execSync } from 'child_process';
 
 /**
  * Unix/Linux/macOS platform adapter for file locking
@@ -155,7 +156,7 @@ export class UnixAdapter extends BasePlatformAdapter {
    */
   private commandExists(command: string): boolean {
     try {
-      require('child_process').execSync(`which ${command}`, { stdio: 'ignore' });
+      execSync(`which ${command}`, { stdio: 'ignore' });
       return true;
     } catch {
       return false;
