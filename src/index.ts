@@ -94,7 +94,7 @@ handleSmartRouting();
 program
   .name(isAiunlock ? 'aiunlock' : 'ailock')
   .description('AI-Proof File Guard - Protect sensitive files from accidental AI modifications')
-  .version('1.6.0');
+  .version('1.6.1');
 
 // Add commands
 program.addCommand(initCommand);
