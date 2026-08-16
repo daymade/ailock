@@ -8,7 +8,7 @@
  * if the target file is protected before allowing the operation.
  */
 
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { resolve, isAbsolute } from 'path';
 import { existsSync, statSync } from 'fs';
 
@@ -140,7 +140,8 @@ async function checkAilockProtection(filePath) {
       
       // Check if global ailock exists
       try {
-        execSync('which ailock 2>/dev/null || where ailock 2>NUL', { stdio: 'pipe' });
+        const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
+        execFileSync(lookupCommand, ['ailock'], { stdio: 'pipe' });
       } catch {
         // Try to use local installation
         const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();

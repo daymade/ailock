@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -13,9 +14,10 @@ const HOOK_SCRIPT = path.resolve(__dirname, '../../hooks/claude-ailock-hook.js')
 /**
  * Helper function to run the hook with input
  */
-async function runHook(input) {
+async function runHook(input, spawnOptions = {}) {
   return new Promise((resolve, reject) => {
-    const hookProcess = spawn('node', [HOOK_SCRIPT], {
+    const hookProcess = spawn(process.execPath, [HOOK_SCRIPT], {
+      ...spawnOptions,
       stdio: ['pipe', 'pipe', 'pipe']
     });
     
@@ -199,6 +201,36 @@ describe('Claude AILock Hook', () => {
       // Check if it logs a warning about missing ailock
       if (result.stderr.includes('command not found')) {
         expect(result.stderr).toContain('Please install ailock');
+      }
+    });
+
+    it('should not create a NUL file when command lookup fails', async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinkle_ailock-hook-'));
+      const targetFile = path.join(tempDir, 'target.txt');
+
+      try {
+        await fs.writeFile(targetFile, 'test content');
+
+        const result = await runHook({
+          tool_name: 'Write',
+          tool_input: {
+            file_path: targetFile,
+            content: 'new content'
+          },
+          cwd: tempDir
+        }, {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            CLAUDE_PROJECT_DIR: tempDir,
+            PATH: ''
+          }
+        });
+
+        expect(result.code).toBe(0);
+        expect(await fs.readdir(tempDir)).not.toContain('NUL');
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
       }
     });
   });
