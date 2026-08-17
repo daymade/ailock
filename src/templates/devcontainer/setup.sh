@@ -8,7 +8,11 @@ echo "🚀 Setting up development environment with ailock protection..."
 # Install project dependencies
 if [ -f package.json ]; then
     echo "📦 Installing Node.js dependencies..."
-    npm install
+    if [ -f package-lock.json ]; then
+        npm ci
+    else
+        npm install
+    fi
 fi
 
 # Initialize ailock if not already configured
@@ -52,17 +56,47 @@ if command -v ailock &> /dev/null; then
     
     # Show current status
     echo "📊 Current ailock status:"
-    ailock status || echo "No files to protect yet"
+    ailock list --json > /dev/null
     
     # Install git hooks if in a git repository
     if [ -d .git ]; then
         echo "🪝 Installing Git hooks for additional protection..."
-        ailock install-hooks --yes || echo "Git hooks installation failed or already exists"
+        ailock hooks git
     fi
     
-    # Lock any existing sensitive files
-    echo "🔒 Locking sensitive files..."
-    ailock lock --verbose || echo "No files found to lock (this is normal for new projects)"
+    # Lock only configured files that are currently writable.
+    echo "🔒 Locking writable sensitive files..."
+    TINKLE_AILOCK_LIST="$(mktemp /tmp/tinkle_ailock-list.XXXXXX.json)"
+    TINKLE_AILOCK_PATHS="$(mktemp /tmp/tinkle_ailock-paths.XXXXXX.bin)"
+    cleanup_ailock_reports() {
+        rm -f -- "$TINKLE_AILOCK_LIST" "$TINKLE_AILOCK_PATHS"
+    }
+    trap cleanup_ailock_reports EXIT
+    ailock list --json > "$TINKLE_AILOCK_LIST"
+    node -e '
+        const fs = require("node:fs");
+        const report = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+        for (const file of report.files) {
+            const filePath = file.absolutePath || file.path;
+            if (!filePath) throw new Error("ailock list entry has no path");
+            process.stdout.write(filePath + "\0");
+        }
+    ' "$TINKLE_AILOCK_LIST" > "$TINKLE_AILOCK_PATHS"
+
+    TINKLE_WRITABLE_FILES=()
+    while IFS= read -r -d '' TINKLE_PROTECTED_FILE; do
+        if [ -w "$TINKLE_PROTECTED_FILE" ]; then
+            TINKLE_WRITABLE_FILES+=("$TINKLE_PROTECTED_FILE")
+        fi
+    done < "$TINKLE_AILOCK_PATHS"
+    cleanup_ailock_reports
+    trap - EXIT
+
+    if [ "${#TINKLE_WRITABLE_FILES[@]}" -gt 0 ]; then
+        ailock lock --no-hooks --verbose "${TINKLE_WRITABLE_FILES[@]}"
+    else
+        echo "✅ No writable configured files need locking"
+    fi
     
 else
     echo "❌ ailock not found - installing..."
@@ -71,7 +105,7 @@ fi
 
 # Set up git configuration for container
 echo "🔧 Configuring Git for container environment..."
-git config --global --add safe.directory $(pwd)
+git config --global --add safe.directory "$(pwd)"
 git config --global init.defaultBranch main
 
 # Create useful aliases
@@ -82,7 +116,7 @@ cat >> ~/.bashrc << 'EOF'
 alias al='ailock'
 alias als='ailock status'
 alias all='ailock list'
-alias ali='ailock status-interactive'
+alias ali='ailock status --interactive'
 alias alock='ailock lock'
 alias aunlock='ailock unlock'
 
@@ -108,8 +142,6 @@ echo "=================================="
 echo ""
 
 if [ -f .ailock ]; then
-    ailock status
-    echo ""
     echo "📄 Protected files:"
     ailock list
 else
@@ -122,7 +154,7 @@ echo "🪝 Git hooks status:"
 if [ -f .git/hooks/pre-commit ] && grep -q "ailock" .git/hooks/pre-commit; then
     echo "✅ Git hooks installed"
 else
-    echo "⚠️  Git hooks not installed - run 'ailock install-hooks'"
+    echo "⚠️  Git hooks not installed - run 'ailock hooks git'"
 fi
 EOF
 chmod +x check-protection.sh
@@ -157,5 +189,5 @@ echo ""
 # Show final status
 if command -v ailock &> /dev/null; then
     echo "📊 Final status:"
-    ailock status
+    ailock list --json > /dev/null
 fi

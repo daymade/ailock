@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/hooks/claude-ailock-hook.js",
+            "command": "node \"$CLAUDE_PROJECT_DIR/hooks/claude-ailock-hook.js\"",
             "timeout": 5000
           }
         ]

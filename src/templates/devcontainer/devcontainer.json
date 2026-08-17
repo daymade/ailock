@@ -1,7 +1,7 @@
 {
   "name": "Node.js Development with ailock Protection",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:18",
-  
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm",
+
   // Features to install in the container
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
@@ -30,38 +30,31 @@
     }
   },
 
-  // Mount the local file system
-  "mounts": [
-    // Mount ailock configuration as read-only to protect it
-    "source=${localWorkspaceFolder}/.ailock,target=${containerWorkspaceFolder}/.ailock,type=bind,readonly",
-    
-    // Mount sensitive directories as read-only
-    "source=${localWorkspaceFolder}/config,target=${containerWorkspaceFolder}/config,type=bind,readonly",
-    "source=${localWorkspaceFolder}/secrets,target=${containerWorkspaceFolder}/secrets,type=bind,readonly",
-    
-    // Mount environment files as read-only (if they exist)
-    "source=${localWorkspaceFolder}/.env,target=${containerWorkspaceFolder}/.env,type=bind,readonly,consistency=cached",
-    "source=${localWorkspaceFolder}/.env.local,target=${containerWorkspaceFolder}/.env.local,type=bind,readonly,consistency=cached"
-  ],
-
   // Command to run after container creation
   "postCreateCommand": "bash .devcontainer/setup.sh",
 
   // Commands to run when attaching to the container
   "postAttachCommand": {
-    "ailock-status": "ailock status || echo 'ailock not configured yet'"
+    "ailock-status": "ailock list --json > /dev/null"
   },
 
   // Life cycle scripts
   "initializeCommand": "echo 'Initializing development container with ailock protection...'",
   "onCreateCommand": {
     "install-ailock": "npm install -g ailock",
-    "setup-git": "git config --global --add safe.directory ${containerWorkspaceFolder}"
+    "setup-git": [
+      "git",
+      "config",
+      "--global",
+      "--add",
+      "safe.directory",
+      "${containerWorkspaceFolder}"
+    ]
   },
 
   // Container user
   "remoteUser": "node",
-  
+
   // Container environment variables
   "remoteEnv": {
     "AILOCK_CONTAINER": "true",

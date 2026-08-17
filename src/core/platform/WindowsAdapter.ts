@@ -1,6 +1,7 @@
 import { Platform } from '../platform.js';
 import { BasePlatformAdapter } from './BasePlatformAdapter.js';
 import { SecureCommandExecutor } from '../../security/CommandExecutor.js';
+import { access, constants } from 'fs/promises';
 import path from 'path';
 
 /**
@@ -23,6 +24,7 @@ export class WindowsAdapter extends BasePlatformAdapter {
     
     // Validate path
     await this.pathValidator.validateAndSanitizePath(absolutePath);
+    await access(absolutePath, constants.F_OK);
 
     // On Windows, we use attrib to set read-only
     await this.setReadOnlyAttribute(absolutePath, true);
@@ -39,6 +41,7 @@ export class WindowsAdapter extends BasePlatformAdapter {
     
     // Validate path
     await this.pathValidator.validateAndSanitizePath(absolutePath);
+    await access(absolutePath, constants.F_OK);
 
     // Remove ACL restrictions first
     await this.setWindowsACL(absolutePath, false);

@@ -1,3 +1,5 @@
+> **SUPERSEDED — historical launch snapshot only.** This pre-launch campaign plan is retired and must not be used as the current release or documentation procedure.
+
 # 🚀 Launch Day Playbook: Viral Execution Guide
 *Hour-by-hour tactical guide for maximum viral impact*
 

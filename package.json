@@ -12,6 +12,7 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "test": "vitest",
+    "test:ci": "vitest run --no-file-parallelism tests/hooks/claude-hook.test.js tests/integration/generated-templates.test.ts tests/integration/glob-operations.test.ts tests/integration/hooks-service.test.ts tests/unit/commands/hooks.test.ts tests/unit/commands/status.test.ts tests/unit/completion.test.ts tests/unit/config-directory-bug.test.ts tests/unit/config.test.ts tests/unit/core/directory-tracker.test.ts tests/unit/file-diagnostics.test.ts tests/unit/gitignore-integration-simple.test.ts tests/unit/platform.test.ts tests/unit/security/validators/GlobValidator.test.ts tests/unit/security/validators/SecurityValidator.test.ts",
     "test:run": "vitest run",
     "test:integration": "npm run build && node scripts/test-integration.js",
     "prepublishOnly": "npm run build"
@@ -40,10 +41,12 @@
     "url": "https://github.com/daymade/ailock/issues"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.19.0"
   },
   "files": [
     "dist/",
+    "hooks/",
+    "src/templates/",
     "README.md",
     "LICENSE"
   ],

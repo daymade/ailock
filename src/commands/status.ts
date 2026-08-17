@@ -231,14 +231,17 @@ export const statusCommand = new Command('status')
   .option('-v, --verbose', 'Show detailed information')
   .option('--simple', 'Force simple non-interactive output')
   .option('--json', 'Output status as JSON')
+  .option('--skip-analytics', 'Skip analytics and first-run prompts for automation')
   .action(async (options) => {
     try {
-      // Initialize user configuration if needed
-      await initializeUserConfig();
-      
-      // Track status check analytics
-      const apiService = getApiService();
-      await apiService.trackUsage('status_check');
+      if (!options.skipAnalytics) {
+        // Interactive commands initialize consent and record usage. Automation such
+        // as PreToolUse hooks must remain local and must not wait on the network.
+        await initializeUserConfig();
+
+        const apiService = getApiService();
+        await apiService.trackUsage('status_check');
+      }
       
       // Handle interactive dashboard
       if (options.interactive) {

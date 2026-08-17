@@ -118,26 +118,25 @@ setup_demo() {
     pause_demo
 }
 
-# Demo Section 1: The Hook - The $10M Mistake
+# Demo Section 1: The Hook
 demo_hook() {
-    print_section "🚨 THE HOOK: The \$10M Mistake"
+    print_section "🚨 THE HOOK: The Accidental Configuration Rewrite"
     
-    echo -e "${RED}${BOLD}\"Last month, a Y Combinator startup lost their Series A funding"
-    echo -e "because GitHub Copilot accidentally committed AWS credentials"
-    echo -e "to a public repository.\"${NC}"
+    echo -e "${RED}${BOLD}\"An AI assistant rewrites a local configuration file"
+    echo -e "that was intentionally excluded from version control.\"${NC}"
     
     longer_pause
     
     echo -e "${YELLOW}The Growing Threat:${NC}"
-    echo "• 73% of developers use AI coding assistants daily"
+    echo "• AI coding assistants are common in daily development"
     echo "• AI tools can modify ANY file with 'apply changes' modes"
     echo "• Most dangerous files (.env, keys, configs) are NOT in version control"
     echo -e "${RED}• Once corrupted by AI = Lost forever${NC}"
     
     longer_pause
     
-    echo -e "${RED}${BOLD}\"Every developer using AI tools is one accidental file modification"
-    echo -e "away from career-ending disaster.\"${NC}"
+    echo -e "${RED}${BOLD}\"One accidental rewrite can leave a local environment"
+    echo -e "without a recoverable configuration source.\"${NC}"
     
     longer_pause
 }
@@ -203,10 +202,8 @@ demo_solution() {
     else
         echo -e "${CYAN}$ ailock init${NC}"
         pause_demo
-        print_success "Complete setup! Detected Node.js project, created config, protected 3 files"
+        print_success "Complete setup! Detected the project, created config, protected configured files"
         print_success "✓ Protected: .env"
-        print_success "✓ Protected: package-lock.json" 
-        print_success "✓ Protected: node_modules/"
         print_success "✓ Git hooks installed"
         echo
     fi
@@ -238,16 +235,16 @@ demo_value() {
     echo -e "${RED}Before ailock:${NC}"
     echo "😰 Constant anxiety during AI coding sessions"
     echo "🔥 Multiple 'close calls' with sensitive files"
-    echo "⏰ 2-3 hours lost per week to file recovery"
+    echo "⏰ Time lost to file recovery"
     echo "💸 One mistake = potential career/company disaster"
     
     pause_demo
     
     echo -e "${GREEN}After ailock:${NC}"
     echo "😌 Complete confidence in AI-assisted development"
-    echo "🛡️  Zero successful file corruptions in 6 months"
-    echo "⚡ 40% faster development with AI tools"
-    echo "💰 Protected \$2.3M in credentials and configurations"
+    echo "🛡️  Protected files reject accidental writes"
+    echo "⚡ Confident AI-assisted development"
+    echo "💰 Local credentials and configurations remain under explicit control"
     
     pause_demo
     
@@ -259,10 +256,10 @@ demo_value() {
     
     pause_demo
     
-    echo -e "${YELLOW}Real Numbers:${NC}"
-    echo "• 500+ companies using ailock in production"
-    echo "• Zero data breaches from AI file modifications"  
-    echo "• 30 seconds average setup time for new projects"
+    echo -e "${YELLOW}Practical Results:${NC}"
+    echo "• Shared .ailock policy across a team"
+    echo "• Read access remains available to AI tools"
+    echo "• Accidental writes are blocked"
     
     longer_pause
 }
@@ -275,9 +272,9 @@ demo_one_more_thing() {
     
     echo -e "${CYAN}$ ailock init  # Works on Linux, macOS, Windows, WSL${NC}"
     pause_demo
-    echo -e "${CYAN}$ ailock generate --template kubernetes${NC}"
+    echo -e "${CYAN}$ ailock generate --template docker-production${NC}"
     pause_demo  
-    echo -e "${CYAN}$ ailock status --json  # Automation-ready${NC}"
+    echo -e "${CYAN}$ ailock status --json --skip-analytics  # Automation-ready${NC}"
     pause_demo
     
     echo
@@ -288,11 +285,10 @@ demo_one_more_thing() {
     
     pause_demo
     
-    print_step "The Complete Security Framework:"
-    echo "• 2,077 lines of enterprise-grade security code"
-    echo "• Four security modules: Path validation, command execution,"
-    echo "  atomic file management, error handling"
-    echo "• Production-ready: Used by companies processing \$50M+ annually"
+    print_step "The Security Framework:"
+    echo "• Path validation, command execution, atomic file management,"
+    echo "  and error handling"
+    echo "• Git and Claude Code hook integrations"
     
     longer_pause
 }
@@ -307,7 +303,7 @@ demo_call_to_action() {
     pause_demo
     echo -e "${GREEN}${BOLD}$ ailock init${NC}"
     pause_demo
-    echo -e "${GREEN}${BOLD}# You're protected in 10 seconds${NC}"
+    echo -e "${GREEN}${BOLD}# Project protection is configured${NC}"
     
     echo
     longer_pause
@@ -317,9 +313,7 @@ demo_call_to_action() {
     echo -e "it's insurance for your career, your company, and your peace of mind.\"${NC}"
     
     echo
-    echo -e "${CYAN}${BOLD}🌐 Website:${NC} ailock.dev"
-    echo -e "${CYAN}${BOLD}📦 GitHub:${NC} github.com/yourusername/ailock"
-    echo -e "${CYAN}${BOLD}🎮 Live Demo:${NC} demo.ailock.dev"
+    echo -e "${CYAN}${BOLD}📦 GitHub:${NC} github.com/daymade/ailock"
     
     longer_pause
 }
@@ -358,7 +352,7 @@ main() {
     cleanup_demo
     
     echo
-    echo -e "${GREEN}${BOLD}🎉 Demo completed! Total time: ~4 minutes${NC}"
+    echo -e "${GREEN}${BOLD}🎉 Demo completed successfully!${NC}"
     echo -e "${CYAN}Thank you for watching the ailock demo!${NC}"
 }
 

@@ -201,7 +201,7 @@ export async function findProtectedFiles(config: AilockConfig): Promise<string[]
       followSymbolicLinks: false
     });
 
-    return files;
+    return files.map(filePath => path.normalize(filePath));
   } catch (error) {
     throw new Error(`Failed to find protected files: ${error instanceof Error ? error.message : String(error)}`);
   }

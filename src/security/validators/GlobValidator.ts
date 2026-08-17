@@ -67,7 +67,7 @@ export class GlobValidator {
         });
         
         for (const match of matches) {
-          matchedFiles.add(match);
+          matchedFiles.add(path.normalize(match));
         }
       } catch (error) {
         console.warn(`Failed to match pattern '${pattern}': ${error}`);
@@ -117,9 +117,11 @@ export class GlobValidator {
    * Check if a path matches any of the given patterns
    */
   matchesPattern(filePath: string, patterns: string[]): boolean {
-    const relativePath = path.relative(process.cwd(), filePath);
+    const relativePath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
     
-    for (const pattern of patterns) {
+    for (const rawPattern of patterns) {
+      const pattern = rawPattern.replace(/\\/g, '/');
+
       // Simple pattern matching (can be enhanced with minimatch if needed)
       if (pattern.includes('*') || pattern.includes('?')) {
         // Convert glob to regex (simplified)
@@ -134,7 +136,7 @@ export class GlobValidator {
         }
       } else {
         // Exact match or directory prefix
-        if (relativePath === pattern || relativePath.startsWith(pattern + path.sep)) {
+        if (relativePath === pattern || relativePath.startsWith(pattern + '/')) {
           return true;
         }
       }
@@ -158,7 +160,7 @@ export class GlobValidator {
         // It's a direct path
         const absolutePath = path.isAbsolute(pattern) ? pattern : path.join(cwd || process.cwd(), pattern);
         if (existsSync(absolutePath)) {
-          expanded.push(absolutePath);
+          expanded.push(path.normalize(absolutePath));
         }
       }
     }

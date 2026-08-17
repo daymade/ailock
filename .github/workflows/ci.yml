@@ -2,40 +2,71 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  verify:
+    name: Node ${{ matrix.node-version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    
+    timeout-minutes: 15
+
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [18.x, 20.x]
-    
+        node-version: [20.x, 24.x]
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Build
-      run: npm run build
-    
-    - name: Run tests
-      run: npm test
-    
-    - name: Test CLI installation
-      run: |
-        npm pack
-        npm install -g ./ailock-*.tgz
-        ailock --version
-        ailock --help
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run maintained CI tests
+        run: npm run test:ci
+
+      - name: Pack CLI artifact
+        id: package
+        run: |
+          npm pack --silent
+          node -e "const fs = require('node:fs'); const files = fs.readdirSync('.').filter((name) => /^ailock-.*[.]tgz$/.test(name)); if (files.length !== 1) throw new Error('Expected exactly one npm package'); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'path=./' + files[0] + String.fromCharCode(10))"
+
+      - name: Test CLI package and installation
+        id: install
+        env:
+          AILOCK_PACKAGE_PATH: ${{ steps.package.outputs.path }}
+          AILOCK_INSTALL_PREFIX: ${{ runner.temp }}/ailock package prefix
+        run: |
+          node -e "const { execFileSync } = require('node:child_process'); const fs = require('node:fs'); const path = require('node:path'); const lookup = process.platform === 'win32' ? ['where.exe', ['npm.cmd']] : ['which', ['npm']]; const npmLauncher = execFileSync(lookup[0], lookup[1], { encoding: 'utf8' }).split(/\r?\n/, 1)[0].trim(); const npmCli = process.platform === 'win32' ? path.join(path.dirname(npmLauncher), 'node_modules', 'npm', 'bin', 'npm-cli.js') : fs.realpathSync(npmLauncher); if (!fs.existsSync(npmCli)) throw new Error('npm CLI entry is missing: ' + npmCli); execFileSync(process.execPath, [npmCli, 'install', '--global', '--prefix', process.env.AILOCK_INSTALL_PREFIX, path.resolve(process.env.AILOCK_PACKAGE_PATH)], { stdio: 'inherit' }); const shim = process.platform === 'win32' ? path.join(process.env.AILOCK_INSTALL_PREFIX, 'ailock.cmd') : path.join(process.env.AILOCK_INSTALL_PREFIX, 'bin', 'ailock'); const entry = process.platform === 'win32' ? path.join(process.env.AILOCK_INSTALL_PREFIX, 'node_modules', 'ailock', 'dist', 'index.js') : path.join(process.env.AILOCK_INSTALL_PREFIX, 'lib', 'node_modules', 'ailock', 'dist', 'index.js'); for (const required of [shim, entry]) if (!fs.existsSync(required)) throw new Error('Installed ailock artifact is missing: ' + required); const run = (args, options = {}) => execFileSync(process.execPath, [entry, ...args], options); for (const args of [['--version'], ['hooks', '--help'], ['hooks', 'git', '--help']]) run(args, { stdio: 'inherit' }); const help = run(['--help'], { encoding: 'utf8' }); if (help.includes('pre-commit-check') || help.includes('completion-helper')) throw new Error('Internal commands leaked into public help'); process.stdout.write(help); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'entry=' + entry + String.fromCharCode(10));"
+
+      - name: Test installed Claude hook
+        env:
+          AILOCK_ENTRY: ${{ steps.install.outputs.entry }}
+          CLAUDE_PROJECT_DIR: ${{ runner.temp }}/ailock claude hook test
+          CI: "true"
+          NON_INTERACTIVE: "1"
+        run: |
+          node -e "const fs = require('node:fs'); const path = require('node:path'); const { execFileSync } = require('node:child_process'); const root = process.env.CLAUDE_PROJECT_DIR; fs.mkdirSync(path.join(root, '.claude'), { recursive: true }); fs.writeFileSync(path.join(root, '.ailock'), 'locked.txt' + String.fromCharCode(10)); fs.writeFileSync(path.join(root, 'locked.txt'), 'locked'); fs.chmodSync(path.join(root, 'locked.txt'), 0o444); fs.writeFileSync(path.join(root, 'open.txt'), 'open'); execFileSync(process.execPath, [process.env.AILOCK_ENTRY, 'hooks', 'install', 'claude'], { cwd: root, env: process.env, stdio: 'inherit' });"
+          node -e "const fs = require('node:fs'); const path = require('node:path'); const { spawnSync } = require('node:child_process'); const root = process.env.CLAUDE_PROJECT_DIR; const settings = JSON.parse(fs.readFileSync(path.join(root, '.claude', 'settings.json'), 'utf8')); const command = settings.hooks.PreToolUse[0].hooks[0].command; const run = (name) => spawnSync(command, { shell: true, input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: path.join(root, name) }, cwd: root }), encoding: 'utf8', env: process.env }); const locked = run('locked.txt'); const open = run('open.txt'); const lockedOutput = JSON.parse(locked.stdout); const openOutput = open.stdout.trim() ? JSON.parse(open.stdout) : {}; if (locked.status !== 0 || locked.stderr.includes('AILock Hook Error') || lockedOutput.hookSpecificOutput?.permissionDecision !== 'deny') throw new Error('Installed hook did not deny the locked file: ' + JSON.stringify(locked)); if (open.status !== 0 || open.stderr.includes('AILock Hook Error') || openOutput.hookSpecificOutput?.permissionDecision) throw new Error('Installed hook did not allow the open file: ' + JSON.stringify(open));"
+
+      - name: Test installed template generation
+        env:
+          AILOCK_ENTRY: ${{ steps.install.outputs.entry }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          node -e "require('node:child_process').execFileSync(process.execPath, [process.env.AILOCK_ENTRY, 'generate', '--template', 'github-actions'], { stdio: 'inherit' })"
+          node -e "const fs = require('node:fs'); const path = '.github/workflows/ailock-protection.yml'; if (!fs.existsSync(path)) throw new Error('Generated workflow is missing'); const text = fs.readFileSync(path, 'utf8'); const nodeVersion = 'node-version: ' + String.fromCharCode(39) + '24' + String.fromCharCode(39); for (const required of ['actions/checkout@v7', 'fetch-depth: 0', 'actions/setup-node@v7', nodeVersion, 'ailock hooks git']) { if (!text.includes(required)) throw new Error('Generated workflow is missing: ' + required); } if (text.includes('ailock install-hooks')) throw new Error('Generated workflow contains the retired hook command')"

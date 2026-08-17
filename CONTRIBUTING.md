@@ -28,19 +28,21 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 
 ### Development Setup
 
+Use npm with a Node.js version supported by the `engines` contract in `package.json`.
+
 ```bash
 # Clone the repository
 git clone https://github.com/daymade/ailock.git
 cd ailock
 
 # Install dependencies
-npm install
+npm ci
 
 # Build the project
 npm run build
 
 # Run tests
-npm test
+npm run test:ci
 
 # Run in development mode
 npm run dev
@@ -50,7 +52,8 @@ npm run dev
 
 - Use TypeScript for all new code
 - Follow existing code style and patterns
-- Ensure all tests pass: `npm test`
+- Ensure the maintained merge gate passes: `npm run test:ci`
+- Use `npm run test:run` when inventorying and triaging the wider legacy suite
 - Add tests for new features
 - Update documentation for API changes
 

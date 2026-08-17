@@ -13,13 +13,16 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
+      with:
+        # The PR check compares HEAD with the target branch. A depth-1 clone
+        # does not contain that base ref.
+        fetch-depth: 0
       
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
-        node-version: '18'
-        cache: 'npm'
+        node-version: '24'
     
     - name: Install ailock
       run: npm install -g ailock
@@ -36,7 +39,7 @@ jobs:
     - name: Check protected files status
       run: |
         echo "📋 Checking protected files status..."
-        ailock status --json > ailock-status.json
+        ailock status --json --skip-analytics > ailock-status.json
         
         # Parse status and validate
         LOCKED_COUNT=$(cat ailock-status.json | jq -r '.lockedFiles | length // 0')
@@ -106,34 +109,40 @@ jobs:
       if: always()
       run: |
         echo "📊 Generating ailock protection report..."
-        
-        cat > ailock-report.md << 'EOF'
-        # 🔒 AI-Proof File Guard Report
-        
-        ## Configuration Status
-        - ✅ .ailock configuration present
-        - 🪝 Git hooks: $(ailock status --json | jq -r '.hasAilockHook // false')
-        - 📊 Total protected files: $(ailock status --json | jq -r '.protectedFiles | length // 0')
-        - 🔒 Currently locked files: $(ailock status --json | jq -r '.lockedFiles | length // 0')
-        
-        ## Protected Files
-        \`\`\`
-        $(ailock list)
-        \`\`\`
-        
-        ## Recommendations
-        - Ensure sensitive files are properly locked before deployment
-        - Review .ailock configuration regularly
-        - Install git hooks: \`ailock install-hooks\`
-        
-        Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        EOF
+
+        {
+          echo '# 🔒 AI-Proof File Guard Report'
+          echo
+          echo '## Configuration Status'
+          echo '- ✅ .ailock configuration present'
+          if [ -s ailock-status.json ] && jq -e . ailock-status.json > /dev/null 2>&1; then
+            printf '%s\n' "- 🪝 Git hooks: $(jq -r '.hasAilockHook // false' ailock-status.json)"
+            printf '%s\n' "- 📊 Total protected files: $(jq -r '.protectedFiles | length // 0' ailock-status.json)"
+            printf '%s\n' "- 🔒 Currently locked files: $(jq -r '.lockedFiles | length // 0' ailock-status.json)"
+          else
+            echo '- ⚠️ Runtime status unavailable because validation did not produce valid JSON'
+          fi
+          echo
+          echo '## Protected Files'
+          echo '~~~'
+          if ! ailock list; then
+            echo 'Protected file list unavailable'
+          fi
+          echo '~~~'
+          echo
+          echo '## Recommendations'
+          echo '- Ensure sensitive files are properly locked before deployment'
+          echo '- Review .ailock configuration regularly'
+          echo '- Install git hooks with: ailock hooks git'
+          echo
+          printf '%s\n' "Generated on: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+        } > ailock-report.md
         
         echo "📋 Report generated: ailock-report.md"
         
     - name: Upload protection report
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ailock-protection-report
         path: |

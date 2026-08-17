@@ -147,7 +147,7 @@ export const listCommand = new Command('list')
             console.log(chalk.green('✅ Pre-commit hook installed'));
           } else {
             console.log(chalk.yellow('⚠️  Pre-commit hook not installed'));
-            console.log(chalk.gray('   Run: ailock install-hooks'));
+            console.log(chalk.gray('   Run: ailock hooks git'));
           }
         }
       } catch {

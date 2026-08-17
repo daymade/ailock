@@ -84,12 +84,18 @@ function getCommandCompletions(partial: string): string[] {
     'lock',
     'unlock',
     'protect',
+    'auth',
+    'quota',
+    'edit',
+    'emergency-unlock',
+    'doctor',
     'status',
     'list',
     'diagnose',
     'generate',
     'hooks',
     'completion',
+    'setup-completion',
     'help'
   ];
   
@@ -194,12 +200,13 @@ async function getPatternCompletions(partial: string, cwd: string): Promise<stri
 
 function getOptionCompletions(command: string, partial: string): string[] {
   const optionsByCommand: Record<string, string[]> = {
-    init: ['--force', '--interactive', '--config-only'],
-    lock: ['--verbose', '--dry-run', '--no-gitignore', '--no-hooks', '--hooks-only'],
+    init: ['--force', '--interactive', '--config-only', '--with-ai-docs', '--no-ai-hooks'],
+    lock: ['--all', '--verbose', '--dry-run', '--no-gitignore', '--no-hooks', '--hooks-only'],
     unlock: ['--verbose', '--dry-run', '--all', '--no-gitignore'],
     protect: ['--verbose', '--dry-run', '--no-gitignore'],
-    status: ['--verbose', '--simple', '--json', '--interactive'],
+    status: ['--interactive', '--verbose', '--simple', '--json', '--skip-analytics'],
     list: ['--long', '--locked-only', '--json'],
+    doctor: ['--fix', '--verbose'],
     diagnose: ['--verbose'],
     generate: ['--template', '--category', '--list', '--force', '--dry-run'],
     hooks: ['setup', 'install', 'uninstall', 'status', 'git']

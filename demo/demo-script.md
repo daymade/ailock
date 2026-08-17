@@ -1,15 +1,15 @@
 # AI-Proof File Guard: Silicon Valley Demo Script
 
-*Duration: 4 minutes | Format: Live Terminal Demo*
+*Format: Live Terminal Demo*
 
 ---
 
-## 🚨 The Hook: "The Daily Developer Nightmare" (30 seconds)
+## 🚨 The Hook: "The Daily Developer Nightmare"
 
 > **"Yesterday, Cursor's AI 'helpfully' rewrote my entire .env file while refactoring, breaking my local development environment for 3 hours."**
 
 ### The Real Problem We All Face
-- 73% of developers now use AI coding assistants daily
+- AI coding assistants are now common in daily development
 - AI tools eagerly modify ANY file they think needs "improvement"
 - Your local configs (.env, docker-compose.yml, settings.json) are NOT in version control
 - **Once AI modifies them = Hours of debugging and restoration**
@@ -19,7 +19,7 @@
 
 ---
 
-## ✨ The Solution: "AI Can Read But Not Write" (90 seconds)
+## ✨ The Solution: "AI Can Read But Not Write"
 
 ### The Perfect Balance
 
@@ -47,7 +47,7 @@ cat .env  # Show the unwanted changes
 
 # Step 2: The ailock solution
 ailock init
-# ✅ Complete setup! Detected Node.js project, created config, protected 3 files
+# ✅ Complete setup! Detected the project, created config, protected configured files
 
 # Step 3: Protection in action
 echo "# AI tries to modify again" >> .env
@@ -60,13 +60,13 @@ ailock lock .env  # Protection restored
 ```
 
 ### The Magic
-- **10-second setup**: `ailock init` and you're protected
-- **Zero learning curve**: Works immediately
+- **One-command setup**: `ailock init` configures project protection
+- **Low-friction adoption**: The existing development workflow stays intact
 - **AI-friendly**: Preserves all AI workflow benefits
 
 ---
 
-## 📊 Value Revelation: "Work Freely with AI" (60 seconds)
+## 📊 Value Revelation: "Work Freely with AI"
 
 ### Before vs After
 
@@ -74,7 +74,7 @@ ailock lock .env  # Protection restored
 ```
 😰 Constantly checking what AI modified
 🔄 Frequent git resets after AI "improvements"
-⏰ 2-3 hours weekly fixing AI-modified configs
+⏰ Time lost recovering AI-modified configs
 🤯 Disabling AI for certain files (losing context)
 ```
 
@@ -82,7 +82,7 @@ ailock lock .env  # Protection restored
 ```
 😌 Full AI assistance without config worries
 ✅ AI reads configs perfectly, can't break them
-⚡ 40% faster development with confident AI use
+⚡ Confident AI-assisted development
 🎯 Focus on coding, not protecting files
 ```
 
@@ -91,65 +91,53 @@ ailock lock .env  # Protection restored
 - **Team Consistency**: Share `.ailock` configs - everyone's local env is safe
 - **Git Integration**: Pre-commit hooks catch accidental config changes
 - **Works with Any AI**: Cursor, Copilot, Claude, Codeium - all respected
-- **Zero Learning Curve**: Your AI workflow stays exactly the same
+- **Low-Friction Adoption**: Your AI workflow stays intact
 
-### Real Impact
-- **500+ development teams** protecting their local environments
-- **Zero broken configs** from AI modifications since adoption  
-- **10 seconds** to protect your entire project
-- **100% compatible** with all AI coding assistants
+### Practical Impact
+- Protected files remain readable to AI tools while accidental writes are blocked
+- The same `.ailock` policy can be shared across a team
+- Filesystem protection is independent of a specific editor integration
 
 ---
 
-## 🎉 "One More Thing": Enterprise-Grade Features (30 seconds)
+## 🎉 "One More Thing": Enterprise-Grade Features
 
 ### Cross-Platform Enterprise
 ```bash
 # Works everywhere out of the box
 ailock init  # Linux, macOS, Windows, WSL
-ailock generate --template kubernetes  # Enterprise templates
-ailock status --json  # Automation-ready
+ailock generate --template docker-production  # Production container template
+ailock status --json --skip-analytics  # Automation-ready
 ```
 
 ### Smart .gitignore Integration
 > **Revolutionary**: ailock automatically discovers and protects sensitive files from your `.gitignore`, creating a safety net for files that aren't in version control.
 
-### The Complete Security Framework
-- **2,077 lines** of enterprise-grade security code
-- **Four security modules**: Path validation, command execution, atomic file management, error handling
-- **Production-ready**: Used by companies processing $50M+ annually
+### The Security Framework
+- Path validation, command execution, atomic file management, and error handling
+- Git and Claude Code hook integrations
 
 ---
 
-## 🚀 Call to Action (15 seconds)
+## 🚀 Call to Action
 
 ### Get Started Now
 ```bash
 npm install -g ailock
 ailock init
-# You're protected in 10 seconds
+# Project protection is configured
 ```
 
 ### The Bottom Line
 > **"Love your AI assistant but hate when it touches your configs? ailock is the boundary-setter that keeps AI helpful, not harmful."**
 
-**Website**: ailock.dev  
-**GitHub**: github.com/yourusername/ailock  
-**Demo**: Try it live at demo.ailock.dev
+**GitHub**: github.com/daymade/ailock
 
 ---
 
 *End of Script*
 
 ## 📝 Presenter Notes
-
-### Timing Breakdown
-- Hook: 30s (establish urgency)
-- Solution Demo: 90s (show simplicity + effectiveness)  
-- Value Revelation: 60s (quantify impact)
-- One More Thing: 30s (enterprise credibility)
-- Call to Action: 15s (clear next steps)
-- **Total: 3:45 minutes**
 
 ### Key Delivery Tips
 1. **Practice the terminal commands** - rehearse until flawless
