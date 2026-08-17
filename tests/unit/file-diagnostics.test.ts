@@ -9,6 +9,7 @@ import { SecureCommandExecutor } from '../../src/security/CommandExecutor.js';
 vi.mock('../../src/security/CommandExecutor.js');
 
 describe('FileDiagnostics Tests', () => {
+  const hostPlatform = process.platform;
   let tempDir: string;
   let testFile: string;
   let diagnostics: FileDiagnostics;
@@ -31,6 +32,10 @@ describe('FileDiagnostics Tests', () => {
   });
 
   afterEach(async () => {
+    Object.defineProperty(process, 'platform', {
+      value: hostPlatform,
+      configurable: true
+    });
     vi.clearAllMocks();
     await rm(tempDir, { recursive: true, force: true });
   });
