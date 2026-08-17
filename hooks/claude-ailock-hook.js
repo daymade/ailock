@@ -8,9 +8,12 @@
  * if the target file is protected before allowing the operation.
  */
 
-import { execFileSync, execSync } from 'child_process';
-import { resolve, isAbsolute } from 'path';
+import { execFileSync } from 'child_process';
+import { resolve, isAbsolute, dirname } from 'path';
 import { existsSync, statSync } from 'fs';
+import { fileURLToPath } from 'url';
+
+const HOOK_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Main hook function
@@ -37,11 +40,11 @@ async function main() {
     // Exit successfully
     process.exit(0);
   } catch (error) {
-    // Log error to stderr for debugging
-    console.error(`AILock Hook Error: ${error.message}`);
-    
-    // Exit successfully to not block operations on error
-    process.exit(0);
+    console.error(`AILock Hook Error: ${error instanceof Error ? error.message : String(error)}`);
+
+    // PreToolUse exit 2 is the protocol-level fail-closed signal. If the hook
+    // cannot determine protection status, do not silently allow the write.
+    process.exit(2);
   }
 }
 
@@ -109,91 +112,73 @@ function extractFilePath(toolName, toolInput) {
  * Check if a file is protected by ailock
  */
 async function checkAilockProtection(filePath) {
-  try {
-    // First, verify the file exists
-    if (!existsSync(filePath)) {
-      // File doesn't exist yet, allow creation
-      return false;
-    }
-    
-    // Primary method: Check file permissions directly
-    // This is the most reliable way to detect if a file is locked
-    try {
-      const { mode } = statSync(filePath);
-      
-      // Check if file is read-only (no write permissions for owner)
-      const isReadOnly = (mode & 0o200) === 0;
-      
-      if (isReadOnly) {
-        // File is locked (read-only)
-        return true;
-      }
-    } catch (error) {
-      // Can't check permissions, continue to other methods
-    }
-    
-    // Secondary method: Use ailock status to check protected files
-    // This catches files that are in .ailock config and locked
-    try {
-      // Determine which ailock command to use
-      let ailockCmd = 'ailock';
-      
-      // Check if global ailock exists
-      try {
-        const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
-        execFileSync(lookupCommand, ['ailock'], { stdio: 'pipe' });
-      } catch {
-        // Try to use local installation
-        const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-        
-        // First check if we're in the ailock project itself
-        const devAilock = resolve(projectDir, 'dist/index.js');
-        const localAilock = resolve(projectDir, 'node_modules/.bin/ailock');
-        
-        if (existsSync(devAilock)) {
-          // We're in the ailock development directory
-          ailockCmd = `node ${devAilock}`;
-        } else if (existsSync(localAilock)) {
-          // Local installation exists
-          ailockCmd = localAilock;
-        } else {
-          // Try npx as fallback
-          ailockCmd = 'npx ailock';
-        }
-      }
-      
-      // Get ailock status
-      const result = execSync(`${ailockCmd} status --json`, {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-      
-      const status = JSON.parse(result);
-      
-      // Check if file is in lockedFiles array
-      if (status.lockedFiles && Array.isArray(status.lockedFiles)) {
-        return status.lockedFiles.includes(filePath);
-      }
-    } catch {
-      // ailock command failed, but we already checked permissions
-    }
-    
-    return false;
-  } catch (error) {
-    // If any unexpected errors occur, allow operation
-    // This ensures the hook doesn't break Claude Code
-    
-    // Check if it's a command not found error
-    if (error.message && (error.message.includes('command not found') || error.message.includes('not recognized'))) {
-      console.error('AILock Hook: ailock command not found. Please install ailock globally: npm install -g ailock');
-    }
-    
+  // First, verify the file exists. Creation of a new file is outside the
+  // chmod-based lock contract and remains allowed.
+  if (!existsSync(filePath)) {
     return false;
   }
+
+  // Primary method: a read-only owner bit is a complete local proof.
+  const { mode } = statSync(filePath);
+  if ((mode & 0o200) === 0) {
+    return true;
+  }
+
+  // Secondary method: query the exact installed package so writable files in
+  // the configured locked set are still denied.
+  let command;
+  let commandArgs;
+  const listArgs = ['list', '--json'];
+  const packagedAilock = resolve(HOOK_DIRECTORY, '../dist/index.js');
+
+  if (existsSync(packagedAilock)) {
+    command = process.execPath;
+    commandArgs = [packagedAilock, ...listArgs];
+  } else {
+    const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const devAilock = resolve(projectDir, 'dist/index.js');
+    const localAilock = resolve(projectDir, 'node_modules/.bin/ailock');
+
+    if (existsSync(devAilock)) {
+      command = process.execPath;
+      commandArgs = [devAilock, ...listArgs];
+    } else if (existsSync(localAilock)) {
+      command = localAilock;
+      commandArgs = listArgs;
+    }
+  }
+
+  if (!command || !commandArgs) {
+    throw new Error('Unable to locate the ailock CLI needed to verify protection status');
+  }
+
+  const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const result = execFileSync(command, commandArgs, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 5000,
+    cwd: projectDir,
+    env: {
+      ...process.env,
+      CI: 'true',
+      NON_INTERACTIVE: '1'
+    }
+  });
+
+  const report = JSON.parse(result);
+  if (!Array.isArray(report.files)) {
+    throw new Error('ailock list returned no files array');
+  }
+
+  return report.files.some(file => {
+    if (!file || file.locked !== true) return false;
+    const listedPath = file.absolutePath || file.path;
+    return typeof listedPath === 'string' && resolve(projectDir, listedPath) === filePath;
+  });
 }
 
 // Run the hook
 main().catch(error => {
-  console.error(`AILock Hook Fatal Error: ${error.message}`);
-  process.exit(0); // Still exit successfully to not break Claude Code
+  console.error(`AILock Hook Fatal Error: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(2);
 });

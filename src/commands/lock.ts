@@ -29,9 +29,16 @@ export function createProtectCommand(): Command {
     .option('--no-gitignore', 'Include files that are gitignored')
     .action(async (patterns: string[], options) => {
       // Force enable hooks for protect command
-      const protectOptions = { ...options, noHooks: false };
+      const protectOptions = { ...options, hooks: true };
       await lockFileAction(patterns, protectOptions);
     });
+}
+
+export function shouldInstallCompleteProtection(options: {
+  hooks?: boolean;
+  dryRun?: boolean;
+}): boolean {
+  return options.hooks !== false && !options.dryRun;
 }
 
 async function lockFileAction(patterns: string[], options: any) {
@@ -67,7 +74,7 @@ async function lockFileAction(patterns: string[], options: any) {
     });
 
     // Install hooks automatically unless disabled or dry-run
-    if (!options.noHooks && !options.dryRun && result.successful.length > 0) {
+    if (shouldInstallCompleteProtection(options) && result.successful.length > 0) {
       console.log(chalk.blue.bold('\n🛡️  Step 2: Installing AI protection...\n'));
       await installCompleteProtection(hooksService, options);
     }

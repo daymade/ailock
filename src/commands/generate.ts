@@ -4,6 +4,10 @@ import inquirer from 'inquirer';
 import { writeFile, mkdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.resolve(moduleDirectory, '..', '..');
 
 interface Template {
   name: string;
@@ -228,7 +232,7 @@ async function generateTemplate(template: Template, options: any) {
 
     try {
       // Read template content
-      const templatePath = path.join(__dirname, '..', 'templates', file.source);
+      const templatePath = path.join(packageRoot, 'src', 'templates', file.source);
       const templateContent = await readFile(templatePath, 'utf-8');
       
       // Ensure target directory exists
@@ -254,6 +258,7 @@ async function generateTemplate(template: Template, options: any) {
       
     } catch (error) {
       console.error(chalk.red(`  ❌ Failed to create ${file.target}:`), error instanceof Error ? error.message : String(error));
+      throw error;
     }
   }
 

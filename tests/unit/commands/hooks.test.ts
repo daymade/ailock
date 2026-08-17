@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { HooksService } from '../../../src/services/HooksService.js';
+import { createHooksCommand } from '../../../src/commands/hooks.js';
+import {
+  createLockCommand,
+  shouldInstallCompleteProtection
+} from '../../../src/commands/lock.js';
+import { AI_PROTECTION_INSTRUCTIONS } from '../../../src/commands/init.js';
 
 // Mock the HooksService
 vi.mock('../../../src/services/HooksService.js');
@@ -22,6 +28,27 @@ describe('hooks command', () => {
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     processExitSpy.mockRestore();
+  });
+
+  it('registers only the supported hook subcommands', () => {
+    const commandNames = createHooksCommand().commands.map(command => command.name());
+
+    expect(commandNames).toEqual(['setup', 'install', 'uninstall', 'status', 'git']);
+    expect(commandNames).not.toContain('install-hooks');
+  });
+
+  it('generates AI instructions with a real per-file diagnostic command', () => {
+    expect(AI_PROTECTION_INSTRUCTIONS).toContain('ailock diagnose <file-path>');
+    expect(AI_PROTECTION_INSTRUCTIONS).not.toContain('ailock status <file-path>');
+  });
+
+  it('honors Commander negated option semantics for lock --no-hooks', () => {
+    const command = createLockCommand();
+    command.parseOptions(['--no-hooks']);
+
+    expect(command.opts().hooks).toBe(false);
+    expect(shouldInstallCompleteProtection(command.opts())).toBe(false);
+    expect(shouldInstallCompleteProtection({ hooks: true, dryRun: false })).toBe(true);
   });
 
   describe('hooks install claude', () => {

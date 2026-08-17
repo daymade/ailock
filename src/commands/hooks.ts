@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { HooksService } from '../services/HooksService.js';
 
 /**
- * Create the unified hooks command (replaces install-hooks)
+ * Create the unified hooks command.
  * Follows Open/Closed Principle - easy to add new AI tools
  */
 export function createHooksCommand(): Command {
@@ -125,7 +125,7 @@ const listCommand = new Command('list')
   });
 
 /**
- * Setup command - install all protection (replaces install-all)
+ * Setup command - install all protection.
  */
 const setupCommand = new Command('setup')
   .description('Install complete protection (Git + AI hooks)')
@@ -192,7 +192,7 @@ const gitCommand = new Command('git')
       if (!isGitRepo) {
         console.log(chalk.yellow('⚠️  Not a Git repository'));
         console.log(chalk.gray('Git hooks can only be installed in Git repositories'));
-        console.log(chalk.blue('💡 Use: ailock hooks install-all (for complete protection)'));
+        console.log(chalk.blue('💡 Use: ailock hooks setup (for complete protection)'));
         process.exit(1);
       }
       
@@ -286,4 +286,3 @@ async function uninstallClaudeHooks(): Promise<void> {
   console.log(chalk.green('✅ Claude Code hooks uninstalled successfully'));
   console.log(chalk.gray('AI tools can now modify all files again'));
 }
-

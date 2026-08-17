@@ -2,10 +2,11 @@
 # This template shows how to integrate ailock with Docker builds
 
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Install ailock for build-time protection
-RUN npm install -g ailock
+RUN apk add --no-cache git jq \
+    && npm install -g ailock
 
 WORKDIR /app
 
@@ -13,32 +14,39 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code (ailock will protect sensitive files)
 COPY . .
 
 # Validate ailock configuration during build
-RUN if [ -f .ailock ]; then \
+RUN set -eu; \
+    if [ -f .ailock ]; then \
       echo "✅ Found ailock configuration"; \
-      ailock status; \
+      ailock list --json > /tmp/ailock-list.json; \
       # Ensure no sensitive files are accidentally copied
-      if ailock list --json | jq -e '.files[] | select(.locked == false)' > /dev/null; then \
+      if jq -e '.files[] | select(.locked == false)' /tmp/ailock-list.json > /dev/null; then \
         echo "⚠️  Warning: Some protected files are unlocked"; \
-        ailock list --unlocked-only; \
+        jq -r '.files[] | select(.locked == false) | .path' /tmp/ailock-list.json; \
       fi; \
+      rm /tmp/ailock-list.json; \
     else \
-      echo "⚠️  No ailock configuration found"; \
+      echo "❌ .ailock configuration is required for the protected production image"; \
+      exit 1; \
     fi
 
-# Build application (if applicable)
-RUN npm run build 2>/dev/null || echo "No build script found"
+# Build application when the project defines a build script, then remove
+# development-only dependencies before copying the runtime tree.
+RUN npm run build --if-present \
+    && npm prune --omit=dev \
+    && mkdir -p node_modules
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:24-alpine AS production
 
 # Install system dependencies for ailock (if needed at runtime)
 RUN apk add --no-cache \
+    curl \
     git \
     && npm install -g ailock
 
@@ -54,17 +62,17 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
 
 # Copy ailock configuration for runtime protection
-COPY --from=builder /app/.ailock ./.ailock 2>/dev/null || echo "No .ailock file to copy"
+COPY --from=builder /app/.ailock ./.ailock
 
 # Set up runtime file protection
 RUN if [ -f .ailock ]; then \
       echo "🔒 Setting up runtime file protection"; \
       # Lock sensitive files that exist
-      ailock lock --verbose || echo "No files to lock"; \
+      ailock lock --verbose; \
       # Make sure critical files are properly protected
-      find . -name "*.env*" -exec chmod 400 {} \; 2>/dev/null || true; \
-      find . -name "*.key" -exec chmod 400 {} \; 2>/dev/null || true; \
-      find . -name "secrets.json" -exec chmod 400 {} \; 2>/dev/null || true; \
+      find . -name "*.env*" -exec chmod 400 {} \;; \
+      find . -name "*.key" -exec chmod 400 {} \;; \
+      find . -name "secrets.json" -exec chmod 400 {} \;; \
     fi
 
 # Change ownership to app user
@@ -74,9 +82,8 @@ USER nodeuser
 # Health check with ailock validation
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node --version && \
-      (ailock status --json > /dev/null || echo "ailock check skipped") && \
-      (curl -f http://localhost:3000/health || exit 1) 2>/dev/null || \
-      echo "Health check passed"
+      ailock list --json > /dev/null && \
+      curl -f http://localhost:3000/health
 
 # Expose port
 EXPOSE 3000

@@ -4,7 +4,7 @@
 # This script installs the ailock hook for Claude Code to prevent
 # accidental modifications of protected files.
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -35,45 +35,81 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Render the same shell-safe command shape as the canonical CLI installer.
+# Keeping Node and the hook path as separately quoted arguments makes package
+# installation prefixes containing spaces safe.
+render_settings() {
+    local hook_script="$1"
+
+    AILOCK_HOOK_SCRIPT_PATH="$hook_script" node <<'NODE'
+const hookScriptPath = process.env.AILOCK_HOOK_SCRIPT_PATH;
+if (!hookScriptPath) throw new Error('AILOCK_HOOK_SCRIPT_PATH is required');
+
+const quote = (value) => {
+  if (process.platform === 'win32') return `"${value}"`;
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+};
+
+const settings = {
+  hooks: {
+    PreToolUse: [
+      {
+        matcher: 'Write|Edit|MultiEdit|NotebookEdit',
+        hooks: [
+          {
+            type: 'command',
+            command: [process.execPath, hookScriptPath].map(quote).join(' '),
+            timeout: 5000
+          }
+        ]
+      }
+    ]
+  }
+};
+
+process.stdout.write(`${JSON.stringify(settings, null, 2)}\n`);
+NODE
+}
+
 # Function to merge JSON settings
 merge_settings() {
     local settings_file="$1"
-    local new_settings="$2"
+    local new_settings_file="$2"
     
     if [ -f "$settings_file" ]; then
         # Backup existing settings
         cp "$settings_file" "${settings_file}.backup.$(date +%Y%m%d_%H%M%S)"
         print_info "Backed up existing settings to ${settings_file}.backup.*"
         
-        # Merge settings using Node.js
-        node -e "
-        const fs = require('fs');
-        const existingSettings = JSON.parse(fs.readFileSync('$settings_file', 'utf8'));
-        const newSettings = $new_settings;
-        
-        // Initialize hooks if not present
-        if (!existingSettings.hooks) {
-            existingSettings.hooks = {};
-        }
-        if (!existingSettings.hooks.PreToolUse) {
-            existingSettings.hooks.PreToolUse = [];
-        }
-        
-        // Check if our hook already exists
-        const hookExists = existingSettings.hooks.PreToolUse.some(hook => 
-            hook.matcher === 'Write|Edit|MultiEdit|NotebookEdit' &&
-            hook.hooks?.some(h => h.command?.includes('claude-ailock-hook.js'))
-        );
-        
-        if (!hookExists) {
-            existingSettings.hooks.PreToolUse.push(newSettings.hooks.PreToolUse[0]);
-        }
-        
-        fs.writeFileSync('$settings_file', JSON.stringify(existingSettings, null, 2));
-        "
+        # Merge settings using path arguments rather than interpolating paths or
+        # JSON into executable source.
+        node - "$settings_file" "$new_settings_file" <<'NODE'
+const fs = require('node:fs');
+const settingsFile = process.argv[2];
+const newSettingsFile = process.argv[3];
+const existingSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+const newSettings = JSON.parse(fs.readFileSync(newSettingsFile, 'utf8'));
+
+if (!existingSettings.hooks) existingSettings.hooks = {};
+if (!existingSettings.hooks.PreToolUse) existingSettings.hooks.PreToolUse = [];
+
+const hookExists = existingSettings.hooks.PreToolUse.some(
+  (hook) =>
+    hook.matcher === 'Write|Edit|MultiEdit|NotebookEdit' &&
+    hook.hooks?.some((candidate) =>
+      candidate.command?.includes('claude-ailock-hook.js')
+    )
+);
+
+if (!hookExists) {
+  existingSettings.hooks.PreToolUse.push(newSettings.hooks.PreToolUse[0]);
+}
+
+fs.writeFileSync(settingsFile, `${JSON.stringify(existingSettings, null, 2)}\n`);
+NODE
     else
         # Create new settings file
-        echo "$new_settings" > "$settings_file"
+        cp "$new_settings_file" "$settings_file"
     fi
 }
 
@@ -133,7 +169,7 @@ echo "1) Project settings (${PROJECT_SETTINGS}) - Applies to this project only"
 echo "2) User settings (${USER_SETTINGS}) - Applies to all projects"
 echo "3) Manual installation (show instructions)"
 echo ""
-read -p "Enter your choice (1-3): " choice
+read -r -p "Enter your choice (1-3): " choice
 
 case $choice in
     1)
@@ -154,12 +190,9 @@ case $choice in
         echo "   - User: ~/.claude/settings.json"
         echo ""
         echo "2. Add the following configuration:"
-        cat "$SCRIPT_DIR/claude-settings.json"
+        render_settings "$HOOK_SCRIPT"
         echo ""
-        echo "3. Update the command path to point to:"
-        echo "   $HOOK_SCRIPT"
-        echo ""
-        echo "4. Save the settings file"
+        echo "3. Save the settings file"
         echo ""
         print_success "Installation instructions displayed"
         exit 0
@@ -173,15 +206,19 @@ esac
 # Step 5: Install the hook configuration
 print_info "Installing hook configuration to $SETTINGS_FILE..."
 
-# Read the template settings
-TEMPLATE_SETTINGS=$(cat "$SCRIPT_DIR/claude-settings.json")
-
-# Update the path in the template to use absolute path
-ABSOLUTE_HOOK_PATH="$HOOK_SCRIPT"
-TEMPLATE_SETTINGS=$(echo "$TEMPLATE_SETTINGS" | sed "s|\$CLAUDE_PROJECT_DIR/hooks/claude-ailock-hook.js|$ABSOLUTE_HOOK_PATH|g")
+# Render the final settings into a private temporary file so paths and JSON are
+# never reinterpreted as shell or JavaScript source.
+TEMPLATE_SETTINGS_FILE="$(mktemp "${TMPDIR:-/tmp}/tinkle_ailock-claude-settings.XXXXXX")"
+cleanup_template_settings() {
+    rm -f -- "$TEMPLATE_SETTINGS_FILE"
+}
+trap cleanup_template_settings EXIT
+render_settings "$HOOK_SCRIPT" > "$TEMPLATE_SETTINGS_FILE"
 
 # Merge settings
-merge_settings "$SETTINGS_FILE" "$TEMPLATE_SETTINGS"
+merge_settings "$SETTINGS_FILE" "$TEMPLATE_SETTINGS_FILE"
+cleanup_template_settings
+trap - EXIT
 
 print_success "Hook configuration installed!"
 

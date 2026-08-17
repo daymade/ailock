@@ -7,7 +7,7 @@ import { generatePowerShellCompletion } from '../completion/templates/powershell
 
 type Shell = 'bash' | 'zsh' | 'fish' | 'powershell';
 
-const shellGenerators: Record<Shell, () => string> = {
+export const shellGenerators: Record<Shell, () => string> = {
   bash: generateBashCompletion,
   zsh: generateZshCompletion,
   fish: generateFishCompletion,

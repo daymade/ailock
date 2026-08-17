@@ -1,10 +1,35 @@
 import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
-import { mkdir, writeFile, rm } from 'fs/promises';
+import { mkdir, writeFile, rm, realpath } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import chalk from 'chalk';
-import { completionCommand, setupCompletionCommand } from '../../src/commands/completion.js';
+import {
+  completionCommand,
+  setupCompletionCommand,
+  shellGenerators
+} from '../../src/commands/completion.js';
 import { completionHelperCommand } from '../../src/commands/completion-helper.js';
+import { generateBashCompletion } from '../../src/completion/templates/bash.js';
+import { generateZshCompletion } from '../../src/completion/templates/zsh.js';
+import { generateFishCompletion } from '../../src/completion/templates/fish.js';
+import { generatePowerShellCompletion } from '../../src/completion/templates/powershell.js';
+import {
+  PUBLIC_COMPLETION_SPEC,
+  PUBLIC_GLOBAL_OPTION_WORDS
+} from '../../src/completion/spec.js';
+import { initCommand } from '../../src/commands/init.js';
+import { createLockCommand, createProtectCommand } from '../../src/commands/lock.js';
+import { unlockCommand } from '../../src/commands/unlock.js';
+import { statusCommand } from '../../src/commands/status.js';
+import { authCommand } from '../../src/commands/auth.js';
+import { quotaCommand } from '../../src/commands/quota.js';
+import { createEditCommand } from '../../src/commands/edit.js';
+import { createEmergencyUnlockCommand } from '../../src/commands/emergency-unlock.js';
+import { createDoctorCommand } from '../../src/commands/doctor.js';
+import { listCommand } from '../../src/commands/list.js';
+import { diagnoseCommand } from '../../src/commands/diagnose.js';
+import { generateCommand } from '../../src/commands/generate.js';
+import { createHooksCommand } from '../../src/commands/hooks.js';
 import * as configModule from '../../src/core/config.js';
 import * as platformModule from '../../src/core/platform.js';
 
@@ -20,8 +45,9 @@ describe('Shell Completion System Tests', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(async () => {
-    tempDir = join(tmpdir(), `ailock-completion-test-${Date.now()}`);
+    tempDir = join(tmpdir(), `tinkle_ailock-completion-test-${Date.now()}`);
     await mkdir(tempDir, { recursive: true });
+    tempDir = await realpath(tempDir);
     
     originalCwd = process.cwd();
     process.chdir(tempDir);
@@ -53,6 +79,92 @@ describe('Shell Completion System Tests', () => {
   });
 
   describe('Completion Command', () => {
+    it('keeps the completion manifest aligned with the public Commander tree', () => {
+      const commands = [
+        initCommand,
+        createLockCommand(),
+        createProtectCommand(),
+        unlockCommand,
+        authCommand,
+        quotaCommand,
+        createEditCommand(),
+        createEmergencyUnlockCommand(),
+        createDoctorCommand(),
+        statusCommand,
+        listCommand,
+        diagnoseCommand,
+        generateCommand,
+        createHooksCommand(),
+        completionCommand,
+        setupCompletionCommand
+      ];
+      const manifestNames = Object.keys(PUBLIC_COMPLETION_SPEC).filter(name => name !== 'help');
+
+      expect(commands.map(command => command.name()).sort()).toEqual(manifestNames.sort());
+
+      for (const command of commands) {
+        const spec = PUBLIC_COMPLETION_SPEC[command.name() as keyof typeof PUBLIC_COMPLETION_SPEC];
+        expect(command.options.map(option => option.long).sort()).toEqual([...(spec.options || [])].sort());
+
+        const expectedSubcommands = Object.keys('subcommands' in spec ? spec.subcommands || {} : {});
+        expect(command.commands.map(subcommand => subcommand.name()).sort()).toEqual(expectedSubcommands.sort());
+
+        for (const subcommand of command.commands) {
+          const subcommandSpec = 'subcommands' in spec
+            ? spec.subcommands?.[subcommand.name() as keyof typeof spec.subcommands]
+            : undefined;
+          expect(subcommand.options.map(option => option.long).sort()).toEqual(
+            [...(subcommandSpec?.options || [])].sort()
+          );
+        }
+      }
+    });
+
+    it('renders every public command, subcommand, and option in all four shells', () => {
+      const scripts = [
+        ['bash', generateBashCompletion()],
+        ['zsh', generateZshCompletion()],
+        ['fish', generateFishCompletion()],
+        ['powershell', generatePowerShellCompletion()]
+      ] as const;
+
+      for (const [shell, script] of scripts) {
+        for (const option of PUBLIC_GLOBAL_OPTION_WORDS) {
+          const rendered = shell === 'fish' && !script.includes(option)
+            ? option.startsWith('--')
+              ? `-l ${option.slice(2)}`
+              : `-s ${option.slice(1)}`
+            : option;
+          expect(script).toContain(rendered);
+        }
+        for (const [command, spec] of Object.entries(PUBLIC_COMPLETION_SPEC)) {
+          expect(script).toContain(command);
+          for (const option of 'options' in spec ? spec.options || [] : []) {
+            const rendered = shell === 'fish' && !script.includes(option)
+              ? `-l ${option.slice(2)}`
+              : option;
+            expect(script).toContain(rendered);
+          }
+          for (const [subcommand, subcommandSpec] of Object.entries(
+            'subcommands' in spec ? spec.subcommands || {} : {}
+          )) {
+            expect(script).toContain(subcommand);
+            for (const option of subcommandSpec.options || []) {
+              const rendered = shell === 'fish' && !script.includes(option)
+                ? `-l ${option.slice(2)}`
+                : option;
+              expect(script).toContain(rendered);
+            }
+          }
+        }
+        expect(script).toContain('github-actions');
+        expect(script).not.toContain('status-interactive');
+        expect(script).not.toContain('bitbucket');
+        expect(script).not.toContain('jenkins');
+        expect(script).not.toContain('circleci');
+      }
+    });
+
     it('should generate bash completion script', async () => {
       await completionCommand.parseAsync(['node', 'test', 'bash']);
       
@@ -113,19 +225,17 @@ describe('Shell Completion System Tests', () => {
     });
 
     it('should handle script generation errors', async () => {
-      // Mock the generator to throw
-      vi.doMock('../completion/templates/bash.js', () => ({
-        generateBashCompletion: () => {
-          throw new Error('Template error');
-        }
-      }));
-      
-      // const cmd = completionCommand;
-      
+      const originalGenerator = shellGenerators.bash;
+      shellGenerators.bash = () => {
+        throw new Error('Template error');
+      };
+
       try {
         await completionCommand.parseAsync(['node', 'test', 'bash']);
       } catch (e) {
         // Expected
+      } finally {
+        shellGenerators.bash = originalGenerator;
       }
       
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -235,6 +345,9 @@ describe('Shell Completion System Tests', () => {
         expect(output).toContain('lock');
         expect(output).toContain('unlock');
         expect(output).toContain('status');
+        expect(output).toContain('doctor');
+        expect(output).toContain('hooks');
+        expect(output).toContain('setup-completion');
         expect(output).toContain('help');
       });
 
@@ -437,4 +550,3 @@ describe('Shell Completion System Tests', () => {
     });
   });
 });
-

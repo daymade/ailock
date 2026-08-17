@@ -20,8 +20,11 @@ export class UnixAdapter extends BasePlatformAdapter {
     // Validate path
     await this.pathValidator.validateAndSanitizePath(absolutePath);
 
-    // First, make the file read-only
-    await this.makeReadOnly(absolutePath);
+    // Avoid chmod on an already immutable macOS file. Re-locking is
+    // intentionally idempotent and should not require an unlock first.
+    if (!(await this.isReadOnly(absolutePath))) {
+      await this.makeReadOnly(absolutePath);
+    }
 
     // Then apply immutable attribute if supported
     if (this.supportsImmutable()) {

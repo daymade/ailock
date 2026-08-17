@@ -108,15 +108,15 @@ program.addCommand(createEmergencyUnlockCommand()); // Emergency unlock for orph
 program.addCommand(statusCommand); // Includes interactive mode with --interactive
 program.addCommand(listCommand);
 program.addCommand(generateCommand);
-program.addCommand(createHooksCommand()); // Unified hook management (replaces install-hooks)
+program.addCommand(createHooksCommand()); // Unified hook management
 program.addCommand(createDoctorCommand()); // Health check and auto-fix
 program.addCommand(diagnoseCommand);
 program.addCommand(completionCommand);
 program.addCommand(setupCompletionCommand);
 
-// Hidden commands (not shown in help)
-program.addCommand(preCommitCheckCommand);
-program.addCommand(completionHelperCommand);
+// Internal commands used by hooks and generated completion scripts.
+program.addCommand(preCommitCheckCommand, { hidden: true });
+program.addCommand(completionHelperCommand, { hidden: true });
 
 // Global error handling
 process.on('uncaughtException', (error) => {

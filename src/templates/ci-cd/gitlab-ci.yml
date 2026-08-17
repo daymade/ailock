@@ -4,7 +4,7 @@ stages:
   - security
 
 variables:
-  NODE_VERSION: "18"
+  NODE_VERSION: "24"
 
 # AI-Proof File Guard Protection Job
 ailock-protection:
@@ -25,7 +25,7 @@ ailock-protection:
     
     # Check protection status
     - echo "📋 Checking protected files status..."
-    - ailock status --json > ailock-status.json
+    - ailock status --json --skip-analytics > ailock-status.json
     - LOCKED_COUNT=$(cat ailock-status.json | jq -r '.lockedFiles | length // 0')
     - PROTECTED_COUNT=$(cat ailock-status.json | jq -r '.protectedFiles | length // 0')
     - echo "🔒 Locked files:$LOCKED_COUNT"
@@ -44,7 +44,7 @@ ailock-protection:
       
       ## Protection Status
       EOF
-    - ailock status >> ailock-report.md
+    - ailock status --skip-analytics >> ailock-report.md
     - echo "📊 Protection report generated"
     
     # Check for merge request changes
@@ -67,8 +67,6 @@ ailock-protection:
         fi
       fi
   artifacts:
-    reports:
-      junit: ailock-status.json
     paths:
       - ailock-report.md
       - ailock-status.json
@@ -105,7 +103,7 @@ sensitive-files-scan:
         echo "💡 Recommendations:"
         echo "   1. Add sensitive file patterns to .ailock configuration"
         echo "   2. Lock sensitive files: ailock lock"
-        echo "   3. Install git hooks: ailock install-hooks"
+        echo "   3. Install git hooks: ailock hooks git"
         echo "   4. Review .gitignore to prevent accidental commits"
         
         # Don't fail the pipeline, just warn
@@ -130,7 +128,7 @@ ailock-integration-test:
     
     # Test basic functionality
     - ailock --version
-    - ailock status
+    - ailock status --skip-analytics
     
     # Test configuration validation
     - |
@@ -147,7 +145,7 @@ ailock-integration-test:
       if [ -f .git/hooks/pre-commit ] && grep -q "ailock" .git/hooks/pre-commit; then
         echo "✅ Git hooks are installed"
       else
-        echo "⚠️  Git hooks not installed - run 'ailock install-hooks'"
+        echo "⚠️  Git hooks not installed - run 'ailock hooks git'"
       fi
   allow_failure: true
   rules:

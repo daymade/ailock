@@ -1,3 +1,5 @@
+> **SUPERSEDED — historical marketing snapshot only.** This alternate README is retired; the root README is the current user-facing source.
+
 # 💔 Does your AI assistant have boundary issues?
 
 [![npm version](https://badge.fury.io/js/ailock.svg)](https://badge.fury.io/js/ailock)

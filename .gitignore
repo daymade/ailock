@@ -32,8 +32,7 @@ coverage/
 *.temp
 .ailock.backup
 
-# Lock files (for testing)
-package-lock.json
+# Alternative lock files
 yarn.lock
 
 # Other projects

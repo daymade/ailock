@@ -47,6 +47,29 @@ interface HookConfig {
 }
 
 /**
+ * Claude Code executes hook commands through the platform shell. Keep the
+ * executable and script path as separate, quoted arguments so package install
+ * prefixes containing spaces cannot turn a working hook into a silent no-op.
+ */
+export function createShellCommand(
+  executable: string,
+  args: string[],
+  platform: NodeJS.Platform = process.platform
+): string {
+  const quote = (value: string): string => {
+    if (platform === 'win32') {
+      // Windows filenames cannot contain a double quote. Quoting the complete
+      // argument is sufficient for the cmd.exe shell used by child_process.
+      return `"${value}"`;
+    }
+
+    return `'${value.replace(/'/g, `'"'"'`)}'`;
+  };
+
+  return [executable, ...args].map(quote).join(' ');
+}
+
+/**
  * Service for managing AI tool hooks
  * Follows Single Responsibility Principle - only manages hook operations
  */
@@ -71,7 +94,7 @@ export class HooksService {
         detected: true,
         projectDir: process.env.CLAUDE_PROJECT_DIR,
         settingsPath: projectSettingsPath,
-        isProjectLevel: existsSync(projectSettingsPath)
+        isProjectLevel: true
       };
     }
     
@@ -117,20 +140,19 @@ export class HooksService {
       return localAilock;
     }
     
-    // Check for global installation
+    // Check for global installation. A missing binary is a configuration
+    // error: hooks must never silently download and execute a package.
     try {
-      // Try Unix-style 'which' command first
-      if (process.platform !== 'win32') {
-        await this.commandExecutor.executeCommand('which', ['ailock']);
-      } else {
-        // Use Windows 'where' command
-        await this.commandExecutor.executeCommand('where', ['ailock']);
+      const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
+      const result = await this.commandExecutor.executeCommand(lookupCommand, ['ailock']);
+      if (result.exitCode === 0 && result.stdout.trim()) {
+        return 'ailock';
       }
-      return 'ailock';
     } catch {
-      // Fallback to npx
-      return 'npx ailock';
+      // The actionable error below is shared by lookup failures and misses.
     }
+
+    throw new Error('Ailock executable not found; install ailock before configuring hooks');
   }
 
   /**
@@ -154,7 +176,7 @@ export class HooksService {
             hooks: [
               {
                 type: "command",
-                command: hookScriptPath,
+                command: createShellCommand(process.execPath, [hookScriptPath]),
                 timeout: this.HOOK_TIMEOUT
               }
             ]
@@ -228,7 +250,10 @@ export class HooksService {
       hooks: {
         ...(existingSettings as HookConfig).hooks,
         PreToolUse: [
-          ...((existingSettings as HookConfig).hooks?.PreToolUse || []),
+          ...((existingSettings as HookConfig).hooks?.PreToolUse || []).filter((item) => {
+            const command = item.hooks?.[0]?.command;
+            return !command || !command.includes('claude-ailock-hook');
+          }),
           ...hookConfig.hooks.PreToolUse
         ]
       }

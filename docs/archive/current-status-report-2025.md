@@ -1,3 +1,5 @@
+> **SUPERSEDED — historical snapshot only.** This report describes the repository in 2025 and is not an operational status source. Use the root README, Quick Start guide, package scripts, and current CI workflow for present behavior.
+
 # AI-Proof File Guard: Current Status Report
 
 ## Executive Summary
