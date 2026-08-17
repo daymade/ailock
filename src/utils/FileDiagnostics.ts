@@ -1,5 +1,6 @@
 import { stat, access, constants } from 'fs/promises';
 import { platform } from 'os';
+import path from 'path';
 import { SecureCommandExecutor } from '../security/CommandExecutor.js';
 
 export interface FilePermissionInfo {
@@ -142,7 +143,7 @@ export class FileDiagnostics {
   async checkAtomicLock(filePath: string): Promise<boolean> {
     try {
       const lockDir = '.ailock-locks';
-      const basename = filePath.split('/').pop() || 'unknown';
+      const basename = path.basename(filePath) || 'unknown';
       const lockFilePath = `${lockDir}/${basename}.lock`;
       
       await access(lockFilePath, constants.F_OK);
@@ -163,8 +164,11 @@ export class FileDiagnostics {
     const diagnosis: string[] = [];
     const recommendations: string[] = [];
 
-    // Analyze permissions
-    if (permissions.octal === '444') {
+    // Windows exposes file protection through attributes and ACLs rather than
+    // portable POSIX mode bits. Do not suggest chmod based on emulated modes.
+    if (flags.platform === 'win32') {
+      diagnosis.push('Windows file permissions are managed through file attributes and ACLs');
+    } else if (permissions.octal === '444') {
       diagnosis.push('File has read-only permissions (444)');
     } else if (permissions.octal === '644') {
       diagnosis.push('File has normal write permissions (644)');
@@ -189,7 +193,7 @@ export class FileDiagnostics {
     }
 
     // Provide general recommendations
-    if (permissions.octal === '444' && !flags.hasImmutableFlag) {
+    if (permissions.octal === '444' && !flags.hasImmutableFlag && flags.platform !== 'win32') {
       recommendations.push('Run: chmod 644 <file>');
     }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, writeFile, rm } from 'fs/promises';
-import { join } from 'path';
+import { join, relative } from 'path';
 import { tmpdir } from 'os';
 import { parseAilockContent, loadConfig, findProtectedFiles } from '../../src/core/config.js';
 
@@ -125,7 +125,7 @@ parent-config.json`;
       };
       
       const files = await findProtectedFiles(config);
-      const relativeFiles = files.map(f => f.replace(tempDir + '/', ''));
+      const relativeFiles = files.map(filePath => relative(tempDir, filePath).replace(/\\/g, '/'));
       
       expect(relativeFiles).toContain('.env');
       expect(relativeFiles).toContain('.env.local');

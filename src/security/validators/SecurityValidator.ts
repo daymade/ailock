@@ -54,10 +54,14 @@ export class SecurityValidator {
       throw new Error(`Path exceeds maximum length of ${this.maxPathLength} characters`);
     }
 
+    // A Windows drive prefix is the only valid use of a colon in a path.
+    const pathWithoutDrivePrefix = /^[A-Za-z]:[\\/]/.test(inputPath)
+      ? inputPath.slice(2)
+      : inputPath;
+
     // Check for suspicious patterns
     const suspiciousPatterns = [
       /\.\.\/\.\.\/\.\.\//, // Multiple directory traversals
-      /[<>:"|?*]/, // Invalid characters on Windows
       /\\\\/, // UNC paths
       /^~/, // Home directory expansion
     ];
@@ -68,8 +72,12 @@ export class SecurityValidator {
       }
     }
 
+    if (/[<>:"|?*]/.test(pathWithoutDrivePrefix)) {
+      throw new Error('Path contains invalid Windows characters');
+    }
+
     // Validate each path component
-    const components = inputPath.split(path.sep).filter(Boolean);
+    const components = inputPath.split(/[\\/]/).filter(Boolean);
     for (const component of components) {
       this.validatePathComponent(component);
     }

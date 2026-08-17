@@ -36,7 +36,7 @@ describe('FileDiagnostics Tests', () => {
   });
 
   describe('getFilePermissions', () => {
-    it('should get file permissions correctly', async () => {
+    it.skipIf(process.platform === 'win32')('should get file permissions correctly', async () => {
       // Set specific permissions
       await chmod(testFile, 0o644);
       
@@ -54,7 +54,7 @@ describe('FileDiagnostics Tests', () => {
       });
     });
 
-    it('should detect read-only permissions', async () => {
+    it.skipIf(process.platform === 'win32')('should detect read-only permissions', async () => {
       await chmod(testFile, 0o444);
       
       const permissions = await diagnostics.getFilePermissions(testFile);
@@ -64,7 +64,7 @@ describe('FileDiagnostics Tests', () => {
       expect(permissions.writable).toBe(false); // File should not be writable with 444 permissions
     });
 
-    it('should detect executable permissions', async () => {
+    it.skipIf(process.platform === 'win32')('should detect executable permissions', async () => {
       await chmod(testFile, 0o755);
       
       const permissions = await diagnostics.getFilePermissions(testFile);
@@ -287,7 +287,7 @@ describe('FileDiagnostics Tests', () => {
   });
 
   describe('diagnoseUnlockIssues', () => {
-    it('should diagnose read-only permissions', async () => {
+    it.skipIf(process.platform === 'win32')('should diagnose read-only permissions', async () => {
       await chmod(testFile, 0o444);
       
       const result = await diagnostics.diagnoseUnlockIssues(testFile);
@@ -351,7 +351,7 @@ describe('FileDiagnostics Tests', () => {
       }
     });
 
-    it('should handle normal writable files', async () => {
+    it.skipIf(process.platform === 'win32')('should handle normal writable files', async () => {
       await chmod(testFile, 0o644);
       
       const result = await diagnostics.diagnoseUnlockIssues(testFile);
@@ -360,7 +360,7 @@ describe('FileDiagnostics Tests', () => {
       expect(result.recommendations).toHaveLength(0);
     });
 
-    it('should handle unusual permissions', async () => {
+    it.skipIf(process.platform === 'win32')('should handle unusual permissions', async () => {
       await chmod(testFile, 0o777);
       
       const result = await diagnostics.diagnoseUnlockIssues(testFile);
@@ -368,7 +368,7 @@ describe('FileDiagnostics Tests', () => {
       expect(result.diagnosis).toContain('File has unusual permissions (777)');
     });
 
-    it('should provide no issues message when appropriate', async () => {
+    it.skipIf(process.platform === 'win32')('should provide no issues message when appropriate', async () => {
       await chmod(testFile, 0o644);
       mockCommandExecutor.executeCommand.mockResolvedValue({
         stdout: '-------------e-- test.txt\n', // No immutable flag
@@ -381,6 +381,16 @@ describe('FileDiagnostics Tests', () => {
       // Should have at least the permissions diagnosis
       expect(result.diagnosis.length).toBeGreaterThan(0);
       expect(result.diagnosis).toContain('File has normal write permissions (644)');
+    });
+
+    it.skipIf(process.platform !== 'win32')('should use Windows attribute and ACL semantics', async () => {
+      const result = await diagnostics.diagnoseUnlockIssues(testFile);
+
+      expect(result.flags.platform).toBe('win32');
+      expect(result.diagnosis).toContain(
+        'Windows file permissions are managed through file attributes and ACLs'
+      );
+      expect(result.recommendations).not.toContain('Run: chmod 644 <file>');
     });
   });
 
@@ -467,7 +477,7 @@ describe('FileDiagnostics Tests', () => {
   });
 
   describe('Integration Tests', () => {
-    it('should perform full diagnosis on a locked file', async () => {
+    it.skipIf(process.platform === 'win32')('should perform full diagnosis on a locked file', async () => {
       // Make file read-only
       await chmod(testFile, 0o444);
       

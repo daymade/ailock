@@ -9,6 +9,8 @@ vi.mock('fast-glob');
 
 describe('GlobValidator', () => {
   let validator: GlobValidator;
+  const projectRoot = path.join(path.parse(process.cwd()).root, 'project');
+  const projectPath = (...segments: string[]) => path.join(projectRoot, ...segments);
 
   beforeEach(() => {
     validator = new GlobValidator();
@@ -183,88 +185,83 @@ describe('GlobValidator', () => {
   });
 
   describe('matchesPattern', () => {
-    const originalCwd = process.cwd();
-    
     beforeEach(() => {
-      vi.spyOn(process, 'cwd').mockReturnValue('/project');
-    });
-
-    afterEach(() => {
-      vi.spyOn(process, 'cwd').mockReturnValue(originalCwd);
+      vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
     });
 
     it('should match exact file paths', () => {
-      expect(validator.matchesPattern('/project/src/index.js', ['src/index.js'])).toBe(true);
-      expect(validator.matchesPattern('/project/src/index.js', ['src/other.js'])).toBe(false);
+      expect(validator.matchesPattern(projectPath('src', 'index.js'), ['src/index.js'])).toBe(true);
+      expect(validator.matchesPattern(projectPath('src', 'index.js'), ['src/other.js'])).toBe(false);
     });
 
     it('should match directory prefixes', () => {
-      expect(validator.matchesPattern('/project/src/utils/helper.js', ['src'])).toBe(true);
-      expect(validator.matchesPattern('/project/src/utils/helper.js', ['lib'])).toBe(false);
+      expect(validator.matchesPattern(projectPath('src', 'utils', 'helper.js'), ['src'])).toBe(true);
+      expect(validator.matchesPattern(projectPath('src', 'utils', 'helper.js'), ['lib'])).toBe(false);
     });
 
     it('should match glob patterns with wildcards', () => {
-      expect(validator.matchesPattern('/project/src/index.js', ['src/index.js'])).toBe(true); // Exact match
-      expect(validator.matchesPattern('/project/src/index.js', ['src/*.js'])).toBe(true);
-      expect(validator.matchesPattern('/project/src/utils/helper.js', ['src/*.js'])).toBe(true); // .* matches everything including /
-      expect(validator.matchesPattern('/project/src/index.js', ['src/index.*'])).toBe(true); // Matches any extension
+      expect(validator.matchesPattern(projectPath('src', 'index.js'), ['src/index.js'])).toBe(true); // Exact match
+      expect(validator.matchesPattern(projectPath('src', 'index.js'), ['src/*.js'])).toBe(true);
+      expect(validator.matchesPattern(projectPath('src', 'utils', 'helper.js'), ['src/*.js'])).toBe(true); // .* matches everything including /
+      expect(validator.matchesPattern(projectPath('src', 'index.js'), ['src/index.*'])).toBe(true); // Matches any extension
     });
 
     it('should match patterns with ? wildcard', () => {
-      expect(validator.matchesPattern('/project/test1.txt', ['test?.txt'])).toBe(true); // ? becomes . in regex
-      expect(validator.matchesPattern('/project/test12.txt', ['test?.txt'])).toBe(false);
+      expect(validator.matchesPattern(projectPath('test1.txt'), ['test?.txt'])).toBe(true); // ? becomes . in regex
+      expect(validator.matchesPattern(projectPath('test12.txt'), ['test?.txt'])).toBe(false);
     });
 
     it('should return false if no patterns match', () => {
-      expect(validator.matchesPattern('/project/src/index.js', ['*.py', '*.rb'])).toBe(false);
+      expect(validator.matchesPattern(projectPath('src', 'index.js'), ['*.py', '*.rb'])).toBe(false);
     });
   });
 
   describe('expandPatterns', () => {
     it('should expand glob patterns to file paths', async () => {
       const glob = await import('fast-glob');
-      vi.mocked(glob.default).mockResolvedValue(['/project/file1.js', '/project/file2.js']);
+      vi.mocked(glob.default).mockResolvedValue([projectPath('file1.js'), projectPath('file2.js')]);
       
-      const result = await validator.expandPatterns(['*.js'], '/project');
+      const result = await validator.expandPatterns(['*.js'], projectRoot);
       
-      expect(result).toContain('/project/file1.js');
-      expect(result).toContain('/project/file2.js');
+      expect(result).toContain(projectPath('file1.js'));
+      expect(result).toContain(projectPath('file2.js'));
     });
 
     it('should handle direct file paths', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       
-      const result = await validator.expandPatterns(['src/index.js'], '/project');
+      const result = await validator.expandPatterns(['src/index.js'], projectRoot);
       
-      expect(result).toContain('/project/src/index.js');
+      expect(result).toContain(projectPath('src', 'index.js'));
     });
 
     it('should handle absolute paths', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       
-      const result = await validator.expandPatterns(['/absolute/path/file.js']);
+      const absolutePath = path.join(path.parse(process.cwd()).root, 'absolute', 'path', 'file.js');
+      const result = await validator.expandPatterns([absolutePath]);
       
-      expect(result).toContain('/absolute/path/file.js');
+      expect(result).toContain(absolutePath);
     });
 
     it('should skip non-existent direct paths', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
       
-      const result = await validator.expandPatterns(['nonexistent.js'], '/project');
+      const result = await validator.expandPatterns(['nonexistent.js'], projectRoot);
       
       expect(result).toHaveLength(0);
     });
 
     it('should handle mixed patterns and direct paths', async () => {
       const glob = await import('fast-glob');
-      vi.mocked(glob.default).mockResolvedValue(['/project/glob1.js', '/project/glob2.js']);
+      vi.mocked(glob.default).mockResolvedValue([projectPath('glob1.js'), projectPath('glob2.js')]);
       vi.mocked(fs.existsSync).mockReturnValue(true);
       
-      const result = await validator.expandPatterns(['*.js', 'direct.txt'], '/project');
+      const result = await validator.expandPatterns(['*.js', 'direct.txt'], projectRoot);
       
-      expect(result).toContain('/project/glob1.js');
-      expect(result).toContain('/project/glob2.js');
-      expect(result).toContain('/project/direct.txt');
+      expect(result).toContain(projectPath('glob1.js'));
+      expect(result).toContain(projectPath('glob2.js'));
+      expect(result).toContain(projectPath('direct.txt'));
     });
   });
 });
