@@ -140,7 +140,7 @@ async function checkAilockProtection(filePath) {
       
       // Check if global ailock exists
       try {
-        execSync('which ailock 2>/dev/null || where ailock 2>NUL', { stdio: 'pipe' });
+        execSync(process.platform === 'win32' ? 'where ailock' : 'command -v ailock', { stdio: 'pipe' });
       } catch {
         // Try to use local installation
         const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -156,22 +156,31 @@ async function checkAilockProtection(filePath) {
           // Local installation exists
           ailockCmd = localAilock;
         } else {
-          // Try npx as fallback
-          ailockCmd = 'npx ailock';
+          // No ailock installation found anywhere (not global, not this
+          // project). Do NOT fall back to `npx ailock`: npx fetches the
+          // package from the registry when it isn't cached, turning this
+          // synchronous pre-tool-use check into a multi-second (or hung,
+          // on a flaky network) network call on every single edit. The
+          // permission check above already covers the reliable case;
+          // skip the secondary check when there's nothing installed to
+          // query against.
+          ailockCmd = null;
         }
       }
-      
-      // Get ailock status
-      const result = execSync(`${ailockCmd} status --json`, {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-      
-      const status = JSON.parse(result);
-      
-      // Check if file is in lockedFiles array
-      if (status.lockedFiles && Array.isArray(status.lockedFiles)) {
-        return status.lockedFiles.includes(filePath);
+
+      if (ailockCmd) {
+        // Get ailock status
+        const result = execSync(`${ailockCmd} status --json`, {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        const status = JSON.parse(result);
+
+        // Check if file is in lockedFiles array
+        if (status.lockedFiles && Array.isArray(status.lockedFiles)) {
+          return status.lockedFiles.includes(filePath);
+        }
       }
     } catch {
       // ailock command failed, but we already checked permissions
