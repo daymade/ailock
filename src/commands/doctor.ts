@@ -268,7 +268,7 @@ async function executeDiagnosis(options: DoctorOptions): Promise<void> {
           message: 'Pre-commit hook not installed',
           fix: async () => {
             console.log(chalk.blue('🔧 Installing Git hooks...'));
-            console.log(chalk.gray('💡 Run: ailock hooks install'));
+            console.log(chalk.gray('💡 Run: ailock hooks git'));
           }
         });
       } else {

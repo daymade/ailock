@@ -187,7 +187,7 @@ export const StatusDashboard: React.FC<StatusDashboardProps> = ({ verbose = fals
         
         {status.isGitRepo && !status.hasAilockHook && (
           <Box marginLeft={2}>
-            <Text color="yellow">• Install pre-commit hook: ailock install-hooks</Text>
+            <Text color="yellow">• Install pre-commit hook: ailock hooks git</Text>
           </Box>
         )}
         

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -13,9 +14,10 @@ const HOOK_SCRIPT = path.resolve(__dirname, '../../hooks/claude-ailock-hook.js')
 /**
  * Helper function to run the hook with input
  */
-async function runHook(input) {
+async function runHook(input, spawnOptions = {}, hookScript = HOOK_SCRIPT) {
   return new Promise((resolve, reject) => {
-    const hookProcess = spawn('node', [HOOK_SCRIPT], {
+    const hookProcess = spawn(process.execPath, [hookScript], {
+      ...spawnOptions,
       stdio: ['pipe', 'pipe', 'pipe']
     });
     
@@ -123,7 +125,7 @@ describe('Claude AILock Hook', () => {
       expect(result.stdout).toBe('');
     });
     
-    it('should handle malformed JSON gracefully', async () => {
+    it('should fail closed on malformed JSON', async () => {
       const hookProcess = spawn('node', [HOOK_SCRIPT], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -136,7 +138,7 @@ describe('Claude AILock Hook', () => {
         });
         
         hookProcess.on('close', (code) => {
-          expect(code).toBe(0); // Should exit successfully even on error
+          expect(code).toBe(2);
           expect(stderr).toContain('AILock Hook Error');
           resolve();
         });
@@ -199,6 +201,128 @@ describe('Claude AILock Hook', () => {
       // Check if it logs a warning about missing ailock
       if (result.stderr.includes('command not found')) {
         expect(result.stderr).toContain('Please install ailock');
+      }
+    });
+
+    it('should fail closed without creating a NUL file when command lookup fails', async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinkle_ailock-hook-'));
+      const packageRoot = path.join(tempDir, 'isolated-package');
+      const hookDir = path.join(packageRoot, 'hooks');
+      const hookScript = path.join(hookDir, 'claude-ailock-hook.js');
+      const targetFile = path.join(tempDir, 'target.txt');
+
+      try {
+        await fs.mkdir(hookDir, { recursive: true });
+        await fs.copyFile(HOOK_SCRIPT, hookScript);
+        await fs.writeFile(path.join(packageRoot, 'package.json'), '{"type":"module"}\n');
+        await fs.writeFile(targetFile, 'test content');
+
+        const result = await runHook({
+          tool_name: 'Write',
+          tool_input: {
+            file_path: targetFile,
+            content: 'new content'
+          },
+          cwd: tempDir
+        }, {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            CLAUDE_PROJECT_DIR: tempDir,
+            PATH: ''
+          }
+        }, hookScript);
+
+        expect(result.code).toBe(2);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toContain('Unable to locate the ailock CLI');
+        expect(await fs.readdir(tempDir)).not.toContain('NUL');
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('uses the exact packaged CLI when PATH is empty', async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinkle_ailock-packaged-hook-'));
+      const packageRoot = path.join(tempDir, 'package prefix with spaces');
+      const hookDir = path.join(packageRoot, 'hooks');
+      const distDir = path.join(packageRoot, 'dist');
+      const hookScript = path.join(hookDir, 'claude-ailock-hook.js');
+      const targetFile = path.join(tempDir, 'writable-target.txt');
+
+      try {
+        await fs.mkdir(hookDir, { recursive: true });
+        await fs.mkdir(distDir, { recursive: true });
+        await fs.copyFile(HOOK_SCRIPT, hookScript);
+        await fs.writeFile(path.join(packageRoot, 'package.json'), '{"type":"module"}\n');
+        await fs.writeFile(
+          path.join(distDir, 'index.js'),
+          'process.stdout.write(JSON.stringify({ files: [{ absolutePath: process.env.TINKLE_LOCKED_TARGET, locked: true }] }));\n'
+        );
+        await fs.writeFile(targetFile, 'still writable');
+
+        const result = await runHook({
+          tool_name: 'Write',
+          tool_input: {
+            file_path: targetFile,
+            content: 'new content'
+          },
+          cwd: tempDir
+        }, {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            CLAUDE_PROJECT_DIR: tempDir,
+            PATH: '',
+            TINKLE_LOCKED_TARGET: targetFile
+          }
+        }, hookScript);
+
+        expect(result.code).toBe(0);
+        expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
+        expect(result.stderr).toBe('');
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('fails closed when the packaged CLI returns malformed status JSON', async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinkle_ailock-invalid-status-'));
+      const packageRoot = path.join(tempDir, 'package prefix with spaces');
+      const hookDir = path.join(packageRoot, 'hooks');
+      const distDir = path.join(packageRoot, 'dist');
+      const hookScript = path.join(hookDir, 'claude-ailock-hook.js');
+      const targetFile = path.join(tempDir, 'writable-target.txt');
+
+      try {
+        await fs.mkdir(hookDir, { recursive: true });
+        await fs.mkdir(distDir, { recursive: true });
+        await fs.copyFile(HOOK_SCRIPT, hookScript);
+        await fs.writeFile(path.join(packageRoot, 'package.json'), '{"type":"module"}\n');
+        await fs.writeFile(path.join(distDir, 'index.js'), 'process.stdout.write("not-json");\n');
+        await fs.writeFile(targetFile, 'still writable');
+
+        const result = await runHook({
+          tool_name: 'Write',
+          tool_input: {
+            file_path: targetFile,
+            content: 'new content'
+          },
+          cwd: tempDir
+        }, {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            CLAUDE_PROJECT_DIR: tempDir,
+            PATH: ''
+          }
+        }, hookScript);
+
+        expect(result.code).toBe(2);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toContain('AILock Hook Error');
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
       }
     });
   });

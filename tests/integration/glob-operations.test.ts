@@ -10,6 +10,8 @@ describe('Glob Operations Integration', () => {
   let tempDir: string;
   let validator: GlobValidator;
   let platformAdapter: PlatformAdapter;
+  const includesPath = (files: string[], ...segments: string[]) =>
+    files.some(filePath => filePath.endsWith(path.join(...segments)));
 
   beforeEach(async () => {
     // Create a temporary directory for testing
@@ -48,25 +50,25 @@ describe('Glob Operations Integration', () => {
       const files = await validator.findMatchingFiles(['**/*.js'], { cwd: tempDir });
       
       expect(files).toHaveLength(3);
-      expect(files.some(f => f.endsWith('src/index.js'))).toBe(true);
-      expect(files.some(f => f.endsWith('src/utils/helper.js'))).toBe(true);
-      expect(files.some(f => f.endsWith('tests/test1.spec.js'))).toBe(true);
+      expect(includesPath(files, 'src', 'index.js')).toBe(true);
+      expect(includesPath(files, 'src', 'utils', 'helper.js')).toBe(true);
+      expect(includesPath(files, 'tests', 'test1.spec.js')).toBe(true);
     });
 
     it('should find TypeScript files using glob patterns', async () => {
       const files = await validator.findMatchingFiles(['**/*.ts'], { cwd: tempDir });
       
       expect(files).toHaveLength(3);
-      expect(files.some(f => f.endsWith('src/main.ts'))).toBe(true);
-      expect(files.some(f => f.endsWith('src/utils/math.ts'))).toBe(true);
-      expect(files.some(f => f.endsWith('tests/test2.spec.ts'))).toBe(true);
+      expect(includesPath(files, 'src', 'main.ts')).toBe(true);
+      expect(includesPath(files, 'src', 'utils', 'math.ts')).toBe(true);
+      expect(includesPath(files, 'tests', 'test2.spec.ts')).toBe(true);
     });
 
     it('should find files in specific directories', async () => {
       const files = await validator.findMatchingFiles(['src/**/*'], { cwd: tempDir });
       
       expect(files).toHaveLength(4);
-      expect(files.every(f => f.includes('/src/'))).toBe(true);
+      expect(files.every(filePath => path.relative(tempDir, filePath).startsWith(`src${path.sep}`))).toBe(true);
     });
 
     it('should find files with multiple patterns', async () => {
@@ -76,10 +78,10 @@ describe('Glob Operations Integration', () => {
       ], { cwd: tempDir });
       
       expect(files).toHaveLength(4);
-      expect(files.some(f => f.endsWith('config/dev.json'))).toBe(true);
-      expect(files.some(f => f.endsWith('config/prod.json'))).toBe(true);
-      expect(files.some(f => f.endsWith('.env'))).toBe(true);
-      expect(files.some(f => f.endsWith('.env.local'))).toBe(true);
+      expect(includesPath(files, 'config', 'dev.json')).toBe(true);
+      expect(includesPath(files, 'config', 'prod.json')).toBe(true);
+      expect(includesPath(files, '.env')).toBe(true);
+      expect(includesPath(files, '.env.local')).toBe(true);
     });
 
     it('should respect ignore patterns', async () => {
@@ -89,9 +91,9 @@ describe('Glob Operations Integration', () => {
       });
       
       expect(files).toHaveLength(2);
-      expect(files.some(f => f.endsWith('src/index.js'))).toBe(true);
-      expect(files.some(f => f.endsWith('src/utils/helper.js'))).toBe(true);
-      expect(files.some(f => f.endsWith('test1.spec.js'))).toBe(false);
+      expect(includesPath(files, 'src', 'index.js')).toBe(true);
+      expect(includesPath(files, 'src', 'utils', 'helper.js')).toBe(true);
+      expect(includesPath(files, 'test1.spec.js')).toBe(false);
     });
   });
 
@@ -112,9 +114,9 @@ config/*.json
       
       const files = await findProtectedFiles(config);
       expect(files.length).toBeGreaterThan(0);
-      expect(files.some(f => f.endsWith('src/index.js'))).toBe(true);
-      expect(files.some(f => f.endsWith('config/dev.json'))).toBe(true);
-      expect(files.some(f => f.endsWith('.env'))).toBe(true);
+      expect(includesPath(files, 'src', 'index.js')).toBe(true);
+      expect(includesPath(files, 'config', 'dev.json')).toBe(true);
+      expect(includesPath(files, '.env')).toBe(true);
     });
 
     it('should protect files matching glob patterns', async () => {
@@ -176,7 +178,7 @@ config/*.json
       const files = await validator.findMatchingFiles(['**/deep.txt'], { cwd: tempDir });
       
       expect(files).toHaveLength(1);
-      expect(files[0]).toContain('a/b/c/deep.txt');
+      expect(files[0]).toContain(path.join('a', 'b', 'c', 'deep.txt'));
     });
 
     it('should handle dot files', async () => {
@@ -198,8 +200,8 @@ config/*.json
         '*.md'
       ], tempDir);
       
-      expect(expanded.some(f => f.endsWith('src/index.js'))).toBe(true);
-      expect(expanded.some(f => f.endsWith('README.md'))).toBe(true);
+      expect(includesPath(expanded, 'src', 'index.js')).toBe(true);
+      expect(includesPath(expanded, 'README.md')).toBe(true);
       // 'config' is a directory, should not be included as we only match files
     });
   });

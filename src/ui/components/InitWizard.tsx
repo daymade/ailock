@@ -347,7 +347,7 @@ export const InitWizard: React.FC<InitWizardProps> = ({ onComplete, onCancel }) 
         <Text></Text>
         
         <Text>2. 🪝 Install Git protection: </Text>
-        <Text color="gray">   ailock install-hooks</Text>
+        <Text color="gray">   ailock hooks git</Text>
         <Text></Text>
         
         <Text>3. 📊 Check status anytime: </Text>

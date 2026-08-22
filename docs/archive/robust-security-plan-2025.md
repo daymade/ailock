@@ -1,3 +1,5 @@
+> **SUPERSEDED — historical implementation snapshot only.** This plan predates the current command tree and security implementation; it is not an actionable engineering plan.
+
 # AI-Proof File Guard: Robust Security Implementation Plan
 
 ## Executive Summary

@@ -102,17 +102,7 @@ ${patterns.map(pattern => pattern.startsWith('!') ? pattern : pattern).join('\n'
 // Initialize HooksService for DRY principle
 const hooksService = new HooksService();
 
-/**
- * Setup AI tool documentation (CLAUDE.md)
- */
-async function setupAIDocumentation(): Promise<void> {
-  const claudeDir = path.join(homedir(), '.claude');
-  if (!existsSync(claudeDir)) {
-    await mkdir(claudeDir, { recursive: true });
-  }
-  
-  const claudeMdPath = path.join(claudeDir, 'CLAUDE.md');
-  const protectionInstructions = `
+export const AI_PROTECTION_INSTRUCTIONS = `
 ## AILock File Protection
 
 IMPORTANT: Before modifying any file, check if it's protected by ailock.
@@ -121,7 +111,7 @@ IMPORTANT: Before modifying any file, check if it's protected by ailock.
 
 1. Before any file modification, run:
    \`\`\`bash
-   ailock status <file-path>
+   ailock diagnose <file-path>
    \`\`\`
 
 2. If the file is locked (shows 🔒), you MUST NOT modify it directly.
@@ -142,13 +132,25 @@ Files are locked to prevent accidental modifications of:
 ### Error Handling
 
 If you encounter permission errors when trying to modify a file:
-1. Check if it's protected: \`ailock status <file-path>\`
+1. Check if it's protected: \`ailock diagnose <file-path>\`
 2. If protected, inform the user and ask for explicit permission to unlock
 3. Never try to force modifications or change file permissions without user consent
 
 Remember: Protected files can be read but not written. This is by design.
 `;
+
+/**
+ * Setup AI tool documentation (CLAUDE.md)
+ */
+async function setupAIDocumentation(): Promise<void> {
+  const claudeDir = path.join(homedir(), '.claude');
+  if (!existsSync(claudeDir)) {
+    await mkdir(claudeDir, { recursive: true });
+  }
   
+  const claudeMdPath = path.join(claudeDir, 'CLAUDE.md');
+  const protectionInstructions = AI_PROTECTION_INSTRUCTIONS;
+
   if (existsSync(claudeMdPath)) {
     const existingContent = await import('fs').then(fs => 
       fs.promises.readFile(claudeMdPath, 'utf-8')
@@ -197,7 +199,7 @@ async function performCompleteSetup(options: any): Promise<void> {
       }
     } catch (error) {
       console.log(chalk.yellow('   ⚠️  Git hooks installation skipped'));
-      console.log(chalk.gray(`   💡 Run: ailock install-hooks (later)`));
+      console.log(chalk.gray(`   💡 Run: ailock hooks git (later)`));
     }
   } else {
     console.log(chalk.gray('   ℹ️  Not a Git repository - hooks skipped'));

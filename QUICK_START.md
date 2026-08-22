@@ -1,8 +1,6 @@
 # AI-Proof File Guard - Quick Start Guide
 
-> ⚠️ **Current Status**: The basic lock/unlock functionality described below is currently being stabilized. The core architecture and security framework are complete, but some CLI commands may not work as expected. See [Current Status Report](CURRENT_STATUS_REPORT.md) for details.
-
-## 🚀 **Get Started in 30 Seconds** (When Fully Functional)
+## 🚀 **Get Started**
 
 ### **Simplest Usage - Just Lock a File**
 
@@ -37,7 +35,6 @@ ailock lock .env secrets.json *.key
 ### **Check Status**
 ```bash
 ailock status
-📊 Status: 3 files locked and protected
 ```
 
 ### **Unlock for Editing**
@@ -77,7 +74,6 @@ ailock init
 
 # Now protect all matching files
 ailock lock
-✅ Locked 8 file(s) based on patterns
 ```
 
 ### **Level 3: Git Integration**
@@ -85,7 +81,7 @@ Add commit-time protection:
 
 ```bash
 # Install Git hooks
-ailock install-hooks
+ailock hooks git
 ✅ Git hooks installed
 
 # Now Git blocks commits of locked files
@@ -98,7 +94,6 @@ Full team collaboration features:
 
 ```bash
 # Use project templates
-ailock init --template node-js-backend
 ailock generate --template github-actions
 # Advanced CI/CD and team features
 ```
@@ -126,7 +121,7 @@ ailock lock     # Protects all files matching patterns
 ### **"I want to prevent accidental Git commits of secrets"**
 ```bash
 ailock lock .env            # Protect the file
-ailock install-hooks        # Install Git protection
+ailock hooks git            # Install Git protection
 # Now Git blocks commits of protected files with helpful messages
 ```
 

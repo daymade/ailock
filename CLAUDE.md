@@ -10,6 +10,7 @@ ailock is a CLI tool that protects sensitive files from accidental AI modificati
 
 ### Building and Development
 ```bash
+npm ci               # Reproduce the dependency graph from package-lock.json
 npm run build        # Compile TypeScript to JavaScript (dist/)
 npm run dev         # Run TypeScript directly with tsx (development)
 ```
@@ -28,8 +29,9 @@ source <(node dist/index.js completion bash)
 
 ### Testing
 ```bash
-npm test            # Run all tests with vitest
-npm run test:run    # Run tests once (CI mode)
+npm run test:ci     # Required cross-platform merge gate
+npm test            # Run the full test inventory in watch mode
+npm run test:run    # Run the full test inventory once for debt triage
 
 # Run specific test file
 npx vitest tests/unit/config.test.ts
@@ -104,10 +106,11 @@ The tool installs pre-commit hooks that:
 ## Development Workflow
 
 1. **Making Changes**: Edit TypeScript files in `src/`
-2. **Testing Locally**: Use `npm run dev` to test changes without building
-3. **Running Tests**: Use `npm test` to ensure changes don't break functionality
-4. **Building**: Run `npm run build` to compile to JavaScript
-5. **Testing Built Version**: Test the compiled version in `dist/`
+2. **Installing Dependencies**: Use `npm ci`; `package-lock.json` is the dependency SSOT
+3. **Testing Locally**: Use `npm run dev` to test changes without building
+4. **Running Tests**: Use `npm run test:ci` for the maintained merge gate; use `npm run test:run` to inventory and triage the wider legacy suite without hiding failures
+5. **Building**: Run `npm run build` to compile to JavaScript
+6. **Testing Built Version**: Test the compiled version in `dist/`
 
 ## Important Considerations
 
@@ -125,10 +128,12 @@ The tool installs pre-commit hooks that:
 - File operations should be batched when possible
 - Use fast-glob for pattern matching efficiency
 - Minimize filesystem calls in hot paths
+- PreToolUse hooks must stay local and bounded; use `list --json` so protection checks also work outside Git repositories
 
 ### Security
 - Validate all file paths to prevent directory traversal
 - Use atomic file operations for configuration changes
+- PreToolUse protection checks fail closed: malformed hook input or an unavailable/invalid status check must exit 2 and block the write
 - Never expose or log sensitive file contents
 
 ## Testing Approach

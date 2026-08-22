@@ -1,8 +1,8 @@
-# AI-Proof File Guard (ailock) v1.0.0
+# AI-Proof File Guard (ailock)
 
 [![npm version](https://badge.fury.io/js/ailock.svg)](https://badge.fury.io/js/ailock)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI Status](https://github.com/ai-proof/ailock/workflows/CI/badge.svg)](https://github.com/ai-proof/ailock/actions)
+[![CI Status](https://github.com/daymade/ailock/actions/workflows/ci.yml/badge.svg)](https://github.com/daymade/ailock/actions/workflows/ci.yml)
 
 **🛡️ Protect your local configs from AI coding assistants' well-meaning modifications**
 
@@ -20,13 +20,11 @@ npm install -g ailock
 npx ailock lock .env
 ```
 
-### **🚀 Zero-Config Setup - Get Started in 10 Seconds** 
+### **🚀 Project Setup**
 
 ```bash
 # One command to protect your entire project
 ailock init
-✅ Complete setup! Detected Node.js project, created config, installed hooks, protected 3 files
-✅ Claude Code hooks installed automatically (if detected)
 
 # That's it! Your project is now AI-proof
 # AI can still read sensitive files for context, but cannot modify them
@@ -36,7 +34,7 @@ ailock init
 
 ```bash
 # Level 1: Complete project setup (recommended)
-ailock init                    # 🆕 Smart setup: config + hooks + protection
+ailock init                    # Smart setup: config + hooks + protection
 
 # Level 2: Manual file protection
 ailock lock .env secrets.json  # Lock specific files
@@ -57,7 +55,7 @@ ailock lock .env .env.local
 # Protect API keys and secrets
 ailock lock config/api-keys.json secrets/
 
-# Protect production configurations  
+# Protect production configurations
 ailock lock docker-compose.prod.yml k8s/
 
 # Protect SSH keys and certificates
@@ -68,10 +66,10 @@ ailock unlock .env
 # ... make your changes ...
 ailock lock .env
 
-# 🆕 One-Command Project Setup
+# One-Command Project Setup
 ailock init                    # Complete security setup for your project
 
-# 🆕 Smart .gitignore Integration (now default!)
+# Smart .gitignore integration
 ailock lock                    # Automatically includes .gitignore sensitive files
 ailock lock --verbose          # See exactly what's being protected
 ```
@@ -79,10 +77,11 @@ ailock lock --verbose          # See exactly what's being protected
 ## 🛡️ Why ailock?
 
 ### The Problem
+
 AI coding assistants (GitHub Copilot, Claude Code, Cursor Agent) with "apply changes" modes can accidentally modify sensitive files during automated refactoring or code generation, potentially causing:
 
 - 🔓 **Leaked secrets** in .env files
-- 🔥 **Broken deployments** from modified config files  
+- 🔥 **Broken deployments** from modified config files
 - 💥 **Service outages** from altered infrastructure scripts
 - 🚨 **Security vulnerabilities** from changed access controls
 
@@ -90,25 +89,26 @@ AI coding assistants (GitHub Copilot, Claude Code, Cursor Agent) with "apply cha
 
 ### 💡 Developer-Friendly Design Philosophy
 
-ailock v1.1 introduces **smart .gitignore integration** based on a simple but powerful observation:
+ailock uses **smart .gitignore integration** based on a simple but powerful observation:
 
 > **Files in `.gitignore` are intentionally excluded from version control, making them unrecoverable if accidentally modified.**
 
 Our design philosophy prioritizes **developer experience** without sacrificing security:
 
-1. **Zero Configuration**: `ailock lock --include-gitignored` works immediately without setup
-2. **Smart Filtering**: Only protects *actually sensitive* files from `.gitignore` (`.env`, `*.key`, etc.)
+1. **Zero Configuration**: `ailock lock` works immediately without setup
+2. **Smart Filtering**: Only protects _actually sensitive_ files from `.gitignore` (`.env`, `*.key`, etc.)
 3. **Predictable Behavior**: Clear verbose output shows exactly what's being protected and why
 4. **Non-Intrusive**: Existing workflows remain unchanged, new protection is opt-in
 
 This approach respects the intelligence of `.gitignore` as a security boundary while providing the safety net that AI-assisted development demands.
 
 ### The Solution
+
 ailock provides **multi-layer protection**:
 
 1. **OS-level locks** - Files become read-only at the filesystem level
-2. **Git hooks** - Prevents accidental commits of protected files (Phase 2)
-3. **IDE integration** - Visual indicators and editor-level protection (Phase 3)
+2. **Git hooks** - Prevents accidental commits of protected files
+3. **IDE integration** - Works with editors through the same filesystem protection
 
 **Key benefit**: AI tools can still **read and analyze** protected files for context, but **cannot modify** them.
 
@@ -148,72 +148,84 @@ k8s/**/*.yaml
 ```
 
 ### Default Patterns
+
 If no `.ailock` file exists, these patterns are protected by default:
+
 - `.env`
 - `.env.*`
 - `**/*.key`
 - `**/*.pem`
 - `**/secrets.json`
 
-## 🎯 Complete Command Reference
+## 🎯 Core Command Reference
 
 ### Core Commands
 
 #### `ailock init`
+
 🚀 Complete project security setup - one command to protect everything.
+
 ```bash
-ailock init                 # 🆕 Smart setup: detect project + config + hooks + protection
+ailock init                 # Smart setup: detect project + config + hooks + protection
 ailock init --interactive   # Use detailed wizard for custom setup
 ailock init --config-only   # Only create .ailock configuration file
 ailock init --force        # Overwrite existing configuration and hooks
 ```
 
-**🆕 v1.2**: The new `ailock init` automatically detects your project type (Node.js, Docker, Python), creates appropriate configuration, installs Git hooks, and protects sensitive files - all in one command!
+`ailock init` detects the project type, creates appropriate configuration, installs Git hooks, and protects sensitive files.
 
 #### `ailock lock`
+
 Lock files to prevent modifications.
+
 ```bash
-ailock lock                       # 🆕 Lock files (includes .gitignore by default)
+ailock lock                       # Lock files (includes .gitignore by default)
 ailock lock .env secrets/*        # Lock specific files/patterns
 ailock lock --verbose             # Show detailed output
 ailock lock --dry-run            # Preview changes without applying
-ailock lock --no-gitignore       # 🆕 Exclude .gitignore sensitive files
+ailock lock --no-gitignore       # Exclude .gitignore sensitive files
 ```
 
-**🆕 v1.2 Simplification**: `.gitignore` integration is now **enabled by default** for the safest protection. Use `--no-gitignore` to disable if needed.
+`.gitignore` integration is enabled by default. Use `--no-gitignore` to disable it.
 
 #### `ailock unlock`
+
 Unlock files to allow modifications.
+
 ```bash
-ailock unlock                     # 🆕 Unlock files (includes .gitignore by default)
+ailock unlock                     # Unlock files (includes .gitignore by default)
 ailock unlock .env               # Unlock specific files
 ailock unlock --verbose          # Show detailed output
 ailock unlock --dry-run         # Preview changes without applying
-ailock unlock --no-gitignore     # 🆕 Exclude .gitignore sensitive files
+ailock unlock --no-gitignore     # Exclude .gitignore sensitive files
 ```
 
 ### Status & Monitoring
 
 #### `ailock status`
+
 Show current protection status with smart output detection.
+
 ```bash
-ailock status              # 🆕 Smart output (detailed in terminal, simple in CI)
+ailock status              # Smart output (detailed in terminal, simple in CI)
 ailock status --verbose    # Force detailed information
-ailock status --simple     # 🆕 Force simple output for scripts
-ailock status --json       # JSON output for automation
+ailock status --simple     # Force simple output for scripts
+ailock status --json --skip-analytics # Side-effect-free JSON output for automation
 ```
 
-**🆕 v1.2 Intelligence**: Automatically detects if you're in an interactive terminal and shows appropriate detail level.
+#### `ailock status --interactive`
 
-#### `ailock status-interactive` (alias: `dash`)
 Launch interactive real-time status dashboard.
+
 ```bash
-ailock dash                # Interactive dashboard
-ailock dash --verbose      # Detailed dashboard view
+ailock status --interactive           # Interactive dashboard
+ailock status --interactive --verbose # Detailed dashboard view
 ```
 
-#### `ailock list` (alias: `ls`)
+#### `ailock list`
+
 List all protected files and their status.
+
 ```bash
 ailock list                # Show all protected files
 ailock list --long         # Detailed file information
@@ -223,18 +235,24 @@ ailock list --json         # JSON output
 
 ### Git Integration
 
-#### `ailock install-hooks`
-Install Git pre-commit hooks for protection.
+#### `ailock hooks`
+
+Manage Git and AI-tool protection hooks.
+
 ```bash
-ailock install-hooks       # Interactive installation
-ailock install-hooks --yes # Skip prompts
-ailock install-hooks --force # Overwrite existing hooks
+ailock hooks setup          # Install Git and detected AI-tool hooks
+ailock hooks git            # Install the Git pre-commit hook only
+ailock hooks git --force    # Overwrite an existing Git hook
+ailock hooks install claude # Install Claude Code hooks only
+ailock hooks status         # Check installed AI-tool hooks
 ```
 
 ### Enterprise Features
 
-#### `ailock generate` (alias: `gen`)
+#### `ailock generate`
+
 Generate integration templates for CI/CD and development environments.
+
 ```bash
 ailock generate                           # Interactive template selection
 ailock generate --list                    # List all available templates
@@ -244,13 +262,16 @@ ailock generate --dry-run                 # Preview without creating files
 ```
 
 **Available Templates:**
+
 - `github-actions` - GitHub Actions workflow for protection validation
 - `gitlab-ci` - GitLab CI/CD pipeline integration
 - `docker-production` - Production Dockerfile with ailock integration
 - `devcontainer` - VS Code Dev Container with ailock setup
 
 #### `ailock completion`
+
 Generate shell completion scripts for enhanced CLI experience.
+
 ```bash
 ailock completion bash                    # Generate bash completion script
 ailock completion zsh                     # Generate zsh completion script
@@ -260,16 +281,19 @@ ailock completion bash --install-instructions  # Show installation instructions
 ```
 
 #### `ailock setup-completion`
+
 Interactive setup for shell completions.
+
 ```bash
 ailock setup-completion    # Auto-detect shell and show setup instructions
 ```
 
 **Shell Completion Features:**
+
 - **Command completion**: Auto-complete all ailock commands
 - **Option completion**: Smart suggestions for command options
 - **File path completion**: Context-aware file suggestions based on .ailock patterns
-- **Dynamic completions**: 
+- **Dynamic completions**:
   - `ailock lock <TAB>` suggests unlocked files
   - `ailock unlock <TAB>` suggests locked files
   - `ailock generate <TAB>` suggests available templates
@@ -277,24 +301,28 @@ ailock setup-completion    # Auto-detect shell and show setup instructions
 **Installation Examples:**
 
 Bash:
+
 ```bash
 # Add to ~/.bashrc
 source <(ailock completion bash)
 ```
 
 Zsh:
+
 ```bash
 # Add to ~/.zshrc
 source <(ailock completion zsh)
 ```
 
 Fish:
+
 ```bash
 # Save to completions directory
 ailock completion fish > ~/.config/fish/completions/ailock.fish
 ```
 
 PowerShell:
+
 ```powershell
 # Add to $PROFILE
 ailock completion powershell | Out-String | Invoke-Expression
@@ -304,12 +332,12 @@ ailock completion powershell | Out-String | Invoke-Expression
 
 ailock works consistently across all major platforms:
 
-| Platform | Lock Method | Immutable Support |
-|----------|-------------|-------------------|
-| **Linux** | `chmod + chattr +i` | ✅ Full support |
-| **macOS** | `chmod + chflags` | ✅ Partial support |
-| **Windows** | `attrib +R + icacls` | ⚠️ ACL-based |
-| **WSL** | Hybrid detection | ⚠️ Filesystem-dependent |
+| Platform    | Lock Method          | Immutable Support       |
+| ----------- | -------------------- | ----------------------- |
+| **Linux**   | `chmod + chattr +i`  | ✅ Full support         |
+| **macOS**   | `chmod + chflags`    | ✅ Partial support      |
+| **Windows** | `attrib +R + icacls` | ⚠️ ACL-based            |
+| **WSL**     | Hybrid detection     | ⚠️ Filesystem-dependent |
 
 ### Platform-Specific Notes
 
@@ -363,20 +391,23 @@ ailock init
 ```
 
 **Manual installation** (if needed):
+
 ```bash
-# Run the interactive installer
-./node_modules/ailock/hooks/install.sh
+# Install the project-scoped Claude Code hook
+ailock hooks install claude
 ```
 
 ### How It Works
 
 The integration uses Claude Code's PreToolUse hooks to:
+
 - **Intercept** file modification attempts (Write, Edit, MultiEdit)
-- **Check** protection status via `ailock status`
+- **Check** protection status via the local `ailock list --json` report
 - **Block** modifications to locked files with clear feedback
 - **Allow** read operations for AI context understanding
 
 When Claude Code tries to modify a protected file, you'll see:
+
 ```
 🔒 File is protected by ailock. Run 'ailock unlock config.json' to allow modifications.
 ```
@@ -386,42 +417,44 @@ When Claude Code tries to modify a protected file, you'll see:
 - ✅ **Zero-effort protection**: Works automatically once installed
 - ✅ **Clear feedback**: Know exactly why operations are blocked
 - ✅ **Maintains context**: AI can still read files for understanding
-- ✅ **Fail-safe**: Errors don't block Claude Code operations
-
-📚 **[Full Documentation →](docs/CLAUDE_CODE_INTEGRATION.md)**
+- ✅ **Fail-closed protection**: Malformed hook input or an unavailable protection check blocks the write and surfaces the error
 
 ## 🧪 Development
 
 ### Prerequisites
-- Node.js 18+
-- npm or yarn
+
+- A Node.js version supported by the `engines` contract in `package.json`
+- npm
 
 ### Setup
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/ailock.git
+git clone https://github.com/daymade/ailock.git
 cd ailock
-npm install
+npm ci
 
 # Build
 npm run build
 
-# Test
-npm test
+# Run the maintained merge gate
+npm run test:ci
 
 # Run locally
-npm run dev lock --help
+npm run dev -- lock --help
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
+# Run the maintained cross-platform merge gate
+npm run test:ci
+
+# Run the full test inventory in watch mode
 npm test
 
-# Run tests in watch mode
-npm run test:watch
+# Run the full test inventory once for legacy-debt triage
+npm run test:run
 
 # Run specific test file
 npx vitest tests/unit/config.test.ts
@@ -448,78 +481,39 @@ ailock/
 ## ✨ Key Features
 
 ### 🛡️ Multi-Layer Protection
+
 - **OS-Level Security**: File system permissions prevent any write access
-- **Git Integration**: Pre-commit hooks block commits of protected files  
+- **Git Integration**: Pre-commit hooks block commits of protected files
 - **IDE Support**: Works seamlessly with VS Code, Cursor, and other editors
 - **CI/CD Integration**: Automated validation in your deployment pipeline
 
 ### 🎨 Developer Experience
+
 - **Interactive Setup**: Guided wizard for project initialization
 - **Real-time Dashboard**: Live status monitoring with auto-refresh
 - **Smart Defaults**: Pre-configured protection for common sensitive files
 - **Cross-Platform**: Consistent behavior on Linux, macOS, Windows, and WSL
 
 ### 🏢 Enterprise Ready
+
 - **Template Generation**: Pre-built integrations for popular CI/CD platforms
 - **Container Support**: Docker and dev-container configurations included
 - **Team Workflows**: Shareable configuration and standardized protection
 - **Audit Trails**: Comprehensive logging and status reporting
 
 ### 🔄 Workflow Integration
+
 - **GitHub Actions**: Automated protection validation workflows
 - **GitLab CI/CD**: Pipeline integration with detailed reporting
 - **Docker**: Production-ready containerization with file protection
 - **Dev Containers**: Isolated development environments with security
-
-## 🏆 Project Status - v1.2.0 COMPLETE
-
-All planned features have been successfully implemented and tested:
-
-### 🚀 v1.2.0: Ultimate Simplification (NEW!)
-- **One-command setup**: `ailock init` does everything automatically
-- **Smart project detection**: Auto-detects Node.js, Docker, Python projects
-- **Default safety**: `.gitignore` integration now enabled by default
-- **Intelligent UX**: Status command adapts to terminal environment
-- **Zero learning curve**: New users protected in 10 seconds
-
-### ✅ v1.1.0: Smart .gitignore Integration
-- Automatic discovery of sensitive files from `.gitignore`
-- Intelligent pattern filtering (only truly sensitive files)
-- Zero-config protection for unversioned critical files
-- Enhanced developer experience with detailed verbose output
-
-### ✅ Phase 1: Core CLI (Complete)
-- Cross-platform file locking (chmod, chattr, icacls)
-- .ailock configuration with gitignore syntax
-- Basic lock/unlock commands with comprehensive options
-- Full test coverage and CI/CD validation
-
-### ✅ Phase 2: Git Integration (Complete)
-- Pre-commit hook generation and installation
-- Husky framework integration
-- Commit-time protection with helpful error messages
-- Git repository status monitoring
-
-### ✅ Phase 3: Enhanced UX (Complete)
-- Interactive terminal UI with Ink framework
-- Workspace initialization wizard with project templates
-- Real-time status dashboard with auto-refresh
-- Enhanced file discovery and management
-
-### ✅ Phase 4: Enterprise Features (Complete)
-- CI/CD integration templates (GitHub Actions, GitLab CI)
-- Production Docker configurations with security
-- VS Code Dev Container templates and setup
-- Team workflow standardization tools
-
-## 🚀 Production Ready
-ailock v1.2.0 is now production-ready with **ultimate simplification**, one-command setup, smart project detection, enhanced .gitignore integration, enterprise-grade features, comprehensive testing, and battle-tested security mechanisms.
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### Development Principles
+
 - **Security first**: Never compromise on protection mechanisms
 - **Cross-platform**: Ensure consistent behavior across OS
 - **Developer experience**: Intuitive CLI with helpful error messages
@@ -531,10 +525,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
-- 📚 **Documentation**: [Full docs](https://your-docs-site.com)
-- 🐛 **Bug reports**: [GitHub Issues](https://github.com/your-org/ailock/issues)
-- 💡 **Feature requests**: [GitHub Discussions](https://github.com/your-org/ailock/discussions)
-- 💬 **Community**: [Discord](https://discord.gg/ailock)
+- 🐛 **Bug reports**: [GitHub Issues](https://github.com/daymade/ailock/issues)
+- 💡 **Feature requests**: [GitHub Discussions](https://github.com/daymade/ailock/discussions)
 
 ---
 
