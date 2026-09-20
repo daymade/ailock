@@ -115,6 +115,7 @@ complete -c ailock -n "__ailock_using_command status" -l skip-analytics -d "Skip
 complete -c ailock -n "__ailock_using_command list" -l long -d "Long format with details"
 complete -c ailock -n "__ailock_using_command list" -l locked-only -d "Show only locked files"
 complete -c ailock -n "__ailock_using_command list" -l json -d "JSON output format"
+complete -c ailock -n "__ailock_using_command list" -l file -r -F -d "Report the status of ONE file"
 
 # diagnose command options and file completion
 complete -c ailock -n "__ailock_using_command diagnose" -l verbose -d "Show detailed diagnostics"

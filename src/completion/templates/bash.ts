@@ -116,7 +116,7 @@ _ailock_completion() {
             ;;
             
         list)
-            COMPREPLY=($(compgen -W "--long --locked-only --json" -- "$cur"))
+            COMPREPLY=($(compgen -W "--long --locked-only --json --file" -- "$cur"))
             ;;
             
         diagnose)

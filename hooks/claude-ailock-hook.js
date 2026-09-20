@@ -128,7 +128,13 @@ async function checkAilockProtection(filePath) {
   // the configured locked set are still denied.
   let command;
   let commandArgs;
-  const listArgs = ['list', '--json'];
+  // Ask about THIS file, not the whole project. `ailock list --json` globs every
+  // protected pattern across the project — seconds in a large repo, on every
+  // single write — while the hook only ever needs the verdict for one path.
+  // `--file` answers that directly (see commands/list.ts); the CLI stays the
+  // authority, only the question gets narrower. Calibrated against the full glob
+  // on three corpora before this switch.
+  const listArgs = ['list', '--json', '--file', filePath];
   const packagedAilock = resolve(HOOK_DIRECTORY, '../dist/index.js');
 
   if (existsSync(packagedAilock)) {

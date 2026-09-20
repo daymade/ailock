@@ -96,7 +96,8 @@ ${globalOptions}
                     _arguments \\
                         '--long[Long format with details]' \\
                         '--locked-only[Show only locked files]' \\
-                        '--json[JSON output format]'
+                        '--json[JSON output format]' \
+                        '--file[Report the status of ONE file]:file:_files'
                     ;;
                     
                 diagnose)

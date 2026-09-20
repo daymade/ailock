@@ -83,7 +83,7 @@ export const PUBLIC_COMPLETION_SPEC = {
   },
   list: {
     description: 'List protected files',
-    options: ['--long', '--locked-only', '--json']
+    options: ['--long', '--locked-only', '--json', '--file']
   },
   diagnose: {
     description: 'Diagnose file protection issues',

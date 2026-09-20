@@ -205,7 +205,7 @@ function getOptionCompletions(command: string, partial: string): string[] {
     unlock: ['--verbose', '--dry-run', '--all', '--no-gitignore'],
     protect: ['--verbose', '--dry-run', '--no-gitignore'],
     status: ['--interactive', '--verbose', '--simple', '--json', '--skip-analytics'],
-    list: ['--long', '--locked-only', '--json'],
+    list: ['--long', '--locked-only', '--json', '--file'],
     doctor: ['--fix', '--verbose'],
     diagnose: ['--verbose'],
     generate: ['--template', '--category', '--list', '--force', '--dry-run'],

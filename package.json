@@ -64,6 +64,7 @@
     "ink-text-input": "^6.0.0",
     "inquirer": "^12.8.2",
     "is-path-inside": "^4.0.0",
+    "micromatch": "^4.0.8",
     "omelette": "^0.4.17",
     "path-type": "^6.0.0",
     "proper-lockfile": "^4.1.2",
@@ -75,6 +76,7 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@types/micromatch": "^4.0.10",
     "@types/node": "^24.1.0",
     "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.1.8",
