@@ -153,10 +153,17 @@ async function checkAilockProtection(filePath) {
   }
 
   const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  // 15s, not 5s. `ailock list --json` globs the whole project for the protected
+  // patterns, and this budget has to survive the largest repo it is pointed at:
+  // measured 2026-09-21 in a 209,310-file repo it takes ~3.2s of glob plus ~0.75s
+  // of Node startup, and under concurrent load that crossed the old 5s. When the
+  // CLI was killed mid-run the hook threw ETIMEDOUT, exited 2, and the edit was
+  // blocked — a timeout on work that would have said "allow" anyway.
+  // The host-side hook timeout in settings.json must stay above this one.
   const result = execFileSync(command, commandArgs, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 5000,
+    timeout: 15000,
     cwd: projectDir,
     env: {
       ...process.env,
