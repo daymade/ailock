@@ -37,7 +37,15 @@ export interface FileOperationResult {
   successful: string[];
   failed: Array<{ file: string; error: string }>;
   skipped: string[];
-  quotaBlocked: string[];
+  /**
+   * Files refused before any chmod was attempted, with the reason each was
+   * refused. Not all of these are quota: canLockProject() also refuses paths
+   * inside temporary or system directories, which is a different answer with a
+   * different fix. Collapsing both into one "quota exceeded" message told the
+   * user their quota was spent when it was not — measured 2026-09-21, a fresh
+   * config reporting 0/2 used still printed "Quota exceeded".
+   */
+  blocked: Array<{ file: string; reason: string; quotaExceeded: boolean }>;
   totalFiles: number;
 }
 
@@ -60,7 +68,7 @@ export class FileOperationService {
       successful: [],
       failed: [],
       skipped: [],
-      quotaBlocked: [],
+      blocked: [],
       totalFiles: 0
     };
 
@@ -108,15 +116,28 @@ export class FileOperationService {
         // Check quota before locking (only for lock operations)
         if (operation === 'lock') {
           const quotaCheck = await canLockProject(file);
-          
+
           if (!quotaCheck.canLock) {
-            result.quotaBlocked.push(file);
-            if (options.verbose || result.quotaBlocked.length <= 3) {
-              warn(`  🚫 Quota exceeded for: ${file}`);
+            // canLockProject() refuses for two unrelated reasons: the project
+            // quota really is spent, or the path is not a legitimate project
+            // root (temporary/system directory). Say which one. Reporting the
+            // second as the first sends the user off to buy capacity they do
+            // not need.
+            const quotaExceeded = quotaCheck.quotaUsage.used >= quotaCheck.quotaUsage.quota;
+            const reason = quotaCheck.reason
+              || (quotaExceeded
+                ? `Project quota exceeded (${quotaCheck.quotaUsage.used}/${quotaCheck.quotaUsage.quota})`
+                : 'Lock refused');
+            result.blocked.push({ file, reason, quotaExceeded });
+
+            if (options.verbose || result.blocked.length <= 3) {
+              warn(`  🚫 ${reason} — ${file}`);
             }
-            
-            // Track analytics for conversion trigger
-            if (result.quotaBlocked.length === 1) {
+
+            // Conversion analytics only mean something for a real quota wall.
+            // Counting a refused temp path here would inflate the very signal
+            // used to decide the free tier is too small.
+            if (quotaExceeded && result.blocked.filter(b => b.quotaExceeded).length === 1) {
               const apiService = getApiService();
               await apiService.trackUsage('project_quota_exceeded', {
                 directoryPath: file,
@@ -243,16 +264,32 @@ export class FileOperationService {
       info(chalk.gray(`ℹ️  Skipped ${result.skipped.length} file(s) (${state})`));
     }
 
-    // Quota blocking summary (most important for conversion)
-    if (result.quotaBlocked.length > 0) {
-      error(`\n🚫 Quota exceeded: ${result.quotaBlocked.length} file(s) could not be locked`);
-      
-      // Show project quota status
-      const quotaStatus = await getProjectQuotaStatusSummary();
-      warn(`   Current quota: ${quotaStatus}`);
-      
-      // Show conversion message
-      this.displayConversionMessage(result.quotaBlocked.length);
+    // Blocked summary. Only a genuine quota wall gets the quota framing and the
+    // conversion pitch; anything else is reported as what it actually is.
+    if (result.blocked.length > 0) {
+      const quotaBlocked = result.blocked.filter(b => b.quotaExceeded);
+      const otherBlocked = result.blocked.filter(b => !b.quotaExceeded);
+
+      if (quotaBlocked.length > 0) {
+        error(`\n🚫 Quota exceeded: ${quotaBlocked.length} file(s) could not be locked`);
+        const quotaStatus = await getProjectQuotaStatusSummary();
+        warn(`   Current quota: ${quotaStatus}`);
+        this.displayConversionMessage(quotaBlocked.length);
+      }
+
+      if (otherBlocked.length > 0) {
+        error(`\n🚫 ${otherBlocked.length} file(s) could not be locked:`);
+        const seen = new Set<string>();
+        for (const b of otherBlocked) {
+          // Same reason for many files is one problem, not N problems.
+          if (seen.has(b.reason)) continue;
+          seen.add(b.reason);
+          error(`  • ${b.reason}`);
+        }
+        if (quotaBlocked.length === 0) {
+          warn('   Run from a real project directory, not a temporary or system path.');
+        }
+      }
     }
 
     // Failed summary with helpful suggestions

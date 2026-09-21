@@ -34,6 +34,13 @@ function runJson(args: string[], cwd: string): any {
   }));
 }
 
+/**
+ * 40s, not the 10s default. Every assertion here shells out to a fresh Node
+ * process running the CLI (~0.45s each), and the both-spellings test alone makes
+ * 28 of them — 6.5s on an idle machine, over 10s when the full suite is loading
+ * the box. Raising the budget is honest about that cost; narrowing the corpus to
+ * make the number smaller would drop the coverage the file exists for.
+ */
 describe('ailock list --file (single-file fast path)', () => {
   let project: string;
   let outside: string;
@@ -196,4 +203,4 @@ describe('ailock list --file (single-file fast path)', () => {
       rmSync(custom, { recursive: true, force: true });
     }
   });
-});
+}, 40_000);

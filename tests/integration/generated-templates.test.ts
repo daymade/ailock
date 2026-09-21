@@ -56,6 +56,13 @@ describe('generated template release contracts', () => {
     }
   });
 
+  /**
+   * 40s. This test does real git work — init a bare remote, push, then clone it
+   * twice — and takes 5.5s on an idle machine and 11-17s under full-suite load,
+   * against a 10s default it therefore fails intermittently (measured
+   * 2026-09-21: red in two of three full runs, always as "Test timed out",
+   * green when run alone). The timeout was the only thing wrong with it.
+   */
   it('fetches enough PR history for the generated changed-file check', async () => {
     const fixture = await temporaryDirectory();
     const remote = path.join(fixture, 'remote.git');
@@ -99,7 +106,7 @@ describe('generated template release contracts', () => {
     );
     expect(template).toContain('fetch-depth: 0');
     expect(template).not.toMatch(/^\s*cache:\s*['"]?npm['"]?\s*$/m);
-  });
+  }, 40_000);
 
   it('keeps machine-readable artifacts honest and generated container syntax explicit', async () => {
     const gitlab = await readFile(
