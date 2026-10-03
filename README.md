@@ -402,9 +402,17 @@ ailock hooks install claude
 The integration uses Claude Code's PreToolUse hooks to:
 
 - **Intercept** file modification attempts (Write, Edit, MultiEdit)
-- **Check** protection status via the local `ailock list --json` report
+- **Check** protection status for the target via the local `ailock list --json --file` report
 - **Block** modifications to locked files with clear feedback
 - **Allow** read operations for AI context understanding
+
+The installer writes Claude's hook timeout in seconds and repairs the budget on
+this installation's exact command without replacing unrelated handlers or group
+metadata. Invalid or unsupported settings JSON is rejected instead of overwritten.
+After Node starts, the hook shares one deadline across waiting for stdin EOF,
+parsing input and the status check. Incomplete checks block with exit 2.
+Malformed input is diagnosed without echoing its body. Interpreter startup and
+synchronous operating-system stalls still depend on the host timeout.
 
 When Claude Code tries to modify a protected file, you'll see:
 

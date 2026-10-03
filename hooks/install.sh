@@ -59,7 +59,7 @@ const settings = {
           {
             type: 'command',
             command: [process.execPath, hookScriptPath].map(quote).join(' '),
-            timeout: 5000
+            timeout: 5 // Claude hook timeout is in seconds.
           }
         ]
       }
@@ -87,19 +87,38 @@ merge_settings() {
 const fs = require('node:fs');
 const settingsFile = process.argv[2];
 const newSettingsFile = process.argv[3];
-const existingSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+let existingSettings;
+try {
+  existingSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+} catch {
+  throw new Error('Settings file is not valid JSON; hook installation refused');
+}
 const newSettings = JSON.parse(fs.readFileSync(newSettingsFile, 'utf8'));
 
-if (!existingSettings.hooks) existingSettings.hooks = {};
-if (!existingSettings.hooks.PreToolUse) existingSettings.hooks.PreToolUse = [];
+const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+if (!object(existingSettings) || (existingSettings.hooks !== undefined && !object(existingSettings.hooks))) {
+  throw new Error('Unknown settings object shape; hook installation refused');
+}
+const prior = existingSettings.hooks?.PreToolUse;
+if (prior !== undefined && (!Array.isArray(prior) || prior.some(group =>
+  !object(group) || !Array.isArray(group.hooks) || group.hooks.some(handler =>
+    !object(handler) || typeof handler.type !== 'string' ||
+    (handler.type === 'command' && (typeof handler.command !== 'string' || !handler.command)))))) {
+  throw new Error('Unknown PreToolUse hook shape; hook installation refused');
+}
+if (existingSettings.hooks === undefined) existingSettings.hooks = {};
+if (prior === undefined) existingSettings.hooks.PreToolUse = [];
 
-const hookExists = existingSettings.hooks.PreToolUse.some(
-  (hook) =>
-    hook.matcher === 'Write|Edit|MultiEdit|NotebookEdit' &&
-    hook.hooks?.some((candidate) =>
-      candidate.command?.includes('claude-ailock-hook.js')
-    )
-);
+const owned = newSettings.hooks.PreToolUse[0].hooks[0];
+let hookExists = false;
+for (const group of existingSettings.hooks.PreToolUse) {
+  for (const handler of group.hooks) {
+    if (handler.type === 'command' && handler.command === owned.command) {
+      handler.timeout = owned.timeout;
+      hookExists = true;
+    }
+  }
+}
 
 if (!hookExists) {
   existingSettings.hooks.PreToolUse.push(newSettings.hooks.PreToolUse[0]);
