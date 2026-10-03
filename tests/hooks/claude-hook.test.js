@@ -383,13 +383,20 @@ describe('Claude AILock Hook', () => {
         cwd: __dirname
       };
       
-      const result = await runHook(input);
-      expect(result.code).toBe(0);
-      
-      // Should not block (no output or null output)
-      if (result.stdout) {
-        const output = result.stdout.trim();
-        expect(output).toBe('');
+      // Supply the status-check dependency explicitly, independent of a local build.
+      const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ailock-writable-'));
+      try {
+        await fs.mkdir(path.join(packageRoot, 'hooks')); await fs.mkdir(path.join(packageRoot, 'dist'));
+        const hook = path.join(packageRoot, 'hooks/claude-ailock-hook.js');
+        await fs.copyFile(HOOK_SCRIPT, hook);
+        await fs.writeFile(path.join(packageRoot, 'package.json'), '{"type":"module"}');
+        await fs.writeFile(path.join(packageRoot, 'dist/index.js'), 'process.stdout.write(JSON.stringify({files:[]}));');
+        const result = await runHook(input, {}, hook);
+        expect(result.code).toBe(0);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('');
+      } finally {
+        await fs.rm(packageRoot, { recursive: true, force: true });
       }
     });
     
@@ -543,5 +550,93 @@ describe('Claude AILock Hook', () => {
       expect(result.code).toBe(0);
       expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
     });
+  });
+});
+
+
+describe('AILock whole-entry deadline and private diagnostics', () => {
+  let fixture;
+  beforeEach(async () => {
+    fixture = await fs.mkdtemp(path.join(os.tmpdir(), 'ailock-deadline-'));
+    await fs.mkdir(path.join(fixture, 'hooks')); await fs.mkdir(path.join(fixture, 'dist'));
+    await fs.copyFile(HOOK_SCRIPT, path.join(fixture, 'hooks/claude-ailock-hook.js'));
+    await fs.writeFile(path.join(fixture, 'package.json'), '{"type":"module"}');
+    await fs.writeFile(path.join(fixture, 'target.txt'), 'synthetic writable target');
+  });
+  afterEach(async () => { await fs.rm(fixture, { recursive: true, force: true }); });
+  async function invoke(raw, { delay = 0, close = true, cli = 'process.stdout.write(JSON.stringify({files:[]}));' } = {}) {
+    await fs.writeFile(path.join(fixture, 'dist/index.js'), cli);
+    const start = Date.now();
+    const child = spawn(process.execPath, [path.join(fixture, 'hooks/claude-ailock-hook.js')], { cwd: fixture, env: { ...process.env, HOME: fixture, CLAUDE_PROJECT_DIR: fixture, FIXTURE_RECEIPT: path.join(fixture, 'receipt.json') }, stdio: ['pipe','pipe','pipe'] });
+    let stdout='',stderr=''; child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>stderr+=x);
+    child.stdin.on('error',()=>{});
+    const sending=setTimeout(()=>{ child.stdin.write(raw); if(close)child.stdin.end(); },delay);
+    const cutoff=setTimeout(()=>child.kill('SIGKILL'),6100);
+    const result=await new Promise((resolve,reject)=>{ child.once('error',reject);child.once('close',(code,signal)=>resolve({code,signal,stdout,stderr,ms:Date.now()-start})); });
+    clearTimeout(sending);clearTimeout(cutoff);return result;
+  }
+  function input(extra={}) { return JSON.stringify({tool_name:'Write',tool_input:{file_path:path.join(fixture,'target.txt')},cwd:fixture,...extra}); }
+  it('does not echo a malformed synthetic secret payload', async () => {
+    const result=await invoke('SYN_SECRET_42');
+    expect(result.code).toBe(2);expect(result.stdout).toBe('');expect(result.stderr).toContain('AILock Hook Error');expect(result.stderr).not.toContain('SYN_SECRET_42');
+  });
+  it('bounds a valid payload whose stdin never reaches EOF', async () => {
+    const result=await invoke(input(),{close:false});expect(result.code).toBe(2);expect(result.stderr).toContain('deadline');expect(result.ms).toBeLessThan(4900);
+  });
+  it('charges slow stdin and slow CLI against the same budget', async () => {
+    const cli="import fs from 'fs'; fs.writeFileSync(process.env.FIXTURE_RECEIPT,JSON.stringify({argv:process.argv.slice(2),pid:process.pid})); setTimeout(()=>process.stdout.write(JSON.stringify({files:[]})),2500);";
+    const result=await invoke(input(),{delay:2600,cli});
+    expect(result.code).toBe(2);expect(result.stderr).toContain('deadline');expect(result.ms).toBeLessThan(4900);
+    const receipt=JSON.parse(await fs.readFile(path.join(fixture,'receipt.json'),'utf8'));
+    expect(receipt.argv).toEqual(['list','--json','--file',path.join(fixture,'target.txt')]);
+    let alive=true;try{process.kill(receipt.pid,0);}catch{alive=false;}expect(alive).toBe(false);
+  });
+  it('closes the owned CLI stdin so an EOF-dependent status check completes', async () => {
+    const cli="process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({files:[]})));";
+    const result=await invoke(input(),{cli});expect(result.code).toBe(0);expect(result.stdout).toBe('');expect(result.stderr).toBe('');
+  });
+  it.each([
+    ['allow','process.stdout.write(JSON.stringify({files:[]}));',0,''],
+    ['deny',"process.stdout.write(JSON.stringify({files:[{absolutePath:process.argv[5],locked:true}]}));",0,'deny'],
+    ['failure',"process.stderr.write('SYN_SECRET_42');process.exit(7);",2,''],
+    ['invalid status',"process.stdout.write('SYN_STATUS_42');",2,''],
+    ['missing files','process.stdout.write(JSON.stringify({}));',2,''],
+  ])('preserves %s status semantics',async (_name,cli,code,decision)=>{
+    const result=await invoke(input(),{cli});expect(result.code).toBe(code);
+    if(decision)expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision).toBe(decision);else expect(result.stdout).toBe('');
+    expect(result.stderr).not.toContain('SYN_STATUS_42');
+    expect(result.stderr).not.toContain('SYN_SECRET_42');
+  });
+  it.each([
+    [{},0], [{tool_name:'Write'},0], [{tool_name:'Write',tool_input:{}},0],
+    [{tool_name:'Write',tool_input:null},0], [{tool_name:'Write',tool_input:{file_path:null}},0],
+    [{tool_name:'Write',tool_input:{file_path:''}},0], [null,2],
+  ])('preserves missing/null/empty input semantics for %j',async(payload,code)=>{
+    const result=await invoke(JSON.stringify(payload),{cli:'process.exit(7);'});expect(result.code).toBe(code);expect(result.stdout).toBe('');
+  });
+  it('allows nonexistent files and denies owner-readonly files without querying the CLI',async()=>{
+    const cli="import fs from 'fs';fs.writeFileSync(process.env.FIXTURE_RECEIPT,'queried');process.exit(7);";
+    const absent=await invoke(input({tool_input:{file_path:path.join(fixture,'absent.txt')}}),{cli});expect(absent.code).toBe(0);expect(absent.stdout).toBe('');
+    await fs.chmod(path.join(fixture,'target.txt'),0o444);
+    const readonly=await invoke(input(),{cli});expect(readonly.code).toBe(0);expect(JSON.parse(readonly.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(await fs.stat(path.join(fixture,'receipt.json')).catch(()=>null)).toBeNull();
+  });
+});
+
+describe('AILock cancellation cleanup',()=>{
+  it('kills only its owned status child on cancellation',async()=>{
+    if(process.platform==='win32')return;
+    const root=await fs.mkdtemp(path.join(os.tmpdir(),'ailock-cancel-'));let hook,other;
+    try{
+      await fs.mkdir(path.join(root,'hooks'));await fs.mkdir(path.join(root,'dist'));await fs.copyFile(HOOK_SCRIPT,path.join(root,'hooks/claude-ailock-hook.js'));
+      await fs.writeFile(path.join(root,'package.json'),'{"type":"module"}');await fs.writeFile(path.join(root,'target.txt'),'synthetic');
+      const receipt=path.join(root,'pid.json');await fs.writeFile(path.join(root,'dist/index.js'),"import fs from 'fs';fs.writeFileSync(process.env.FIXTURE_RECEIPT,JSON.stringify({pid:process.pid}));setInterval(()=>{},1000);");
+      other=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});
+      hook=spawn(process.execPath,[path.join(root,'hooks/claude-ailock-hook.js')],{cwd:root,env:{...process.env,HOME:root,CLAUDE_PROJECT_DIR:root,FIXTURE_RECEIPT:receipt},stdio:['pipe','pipe','pipe']});let stderr='';hook.stderr.on('data',data=>stderr+=data);
+      const closed=new Promise(resolve=>hook.once('close',code=>resolve(code)));hook.stdin.end(JSON.stringify({tool_name:'Write',tool_input:{file_path:path.join(root,'target.txt')},cwd:root}));
+      let pid;for(let i=0;i<60;i++){try{pid=JSON.parse(await fs.readFile(receipt,'utf8')).pid;break;}catch{}await new Promise(resolve=>setTimeout(resolve,20));}
+      expect(pid).toBeTypeOf('number');hook.kill('SIGTERM');expect(await closed).toBe(2);expect(stderr).toContain('cancelled');
+      let alive=true;try{process.kill(pid,0);}catch{alive=false;}expect(alive).toBe(false);expect(()=>process.kill(other.pid,0)).not.toThrow();
+    }finally{if(hook&&hook.exitCode===null)hook.kill('SIGKILL');if(other)other.kill('SIGKILL');await fs.rm(root,{recursive:true,force:true});}
   });
 });

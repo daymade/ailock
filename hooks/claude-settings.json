@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/hooks/claude-ailock-hook.js\"",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }

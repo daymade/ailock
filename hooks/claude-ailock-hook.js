@@ -8,29 +8,44 @@
  * if the target file is protected before allowing the operation.
  */
 
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
 import { resolve, isAbsolute, dirname } from 'path';
 import { existsSync, statSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const HOOK_DIRECTORY = dirname(fileURLToPath(import.meta.url));
+// Milliseconds for the entire entry, including waiting for input EOF.
+const HOOK_BUDGET_MS = 4000;
+let activeChild;
+
+function failClosed(message) {
+  // Kill only the status-check child created by this invocation.
+  if (activeChild) activeChild.kill('SIGKILL');
+  console.error(`AILock Hook Error: ${message}`);
+  process.exit(2);
+}
 
 /**
  * Main hook function
  */
 async function main() {
+  const deadline = performance.now() + HOOK_BUDGET_MS;
+  const timer = setTimeout(() => failClosed('protection check deadline exceeded'), HOOK_BUDGET_MS);
+  process.once('SIGTERM', () => failClosed('protection check cancelled (SIGTERM)'));
+  process.once('SIGINT', () => failClosed('protection check cancelled (SIGINT)'));
   let input = '';
-  
-  // Read JSON input from stdin
-  process.stdin.setEncoding('utf8');
-  
-  for await (const chunk of process.stdin) {
-    input += chunk;
-  }
-  
   try {
-    const data = JSON.parse(input);
-    const result = await processHookInput(data);
+    process.stdin.setEncoding('utf8');
+    for await (const chunk of process.stdin) input += chunk;
+    let data;
+    try {
+      data = JSON.parse(input);
+    } catch {
+      // Node's parse error can include the private input body.
+      throw new Error('hook input is not valid JSON');
+    }
+    const result = await processHookInput(data, deadline);
+    if (performance.now() >= deadline) throw new Error('protection check deadline exceeded');
     
     if (result) {
       // Output JSON response
@@ -38,20 +53,17 @@ async function main() {
     }
     
     // Exit successfully
+    clearTimeout(timer);
     process.exit(0);
   } catch (error) {
-    console.error(`AILock Hook Error: ${error instanceof Error ? error.message : String(error)}`);
-
-    // PreToolUse exit 2 is the protocol-level fail-closed signal. If the hook
-    // cannot determine protection status, do not silently allow the write.
-    process.exit(2);
+    failClosed(error instanceof Error ? error.message : 'protection check failed');
   }
 }
 
 /**
  * Process the hook input and determine if operation should be blocked
  */
-async function processHookInput(data) {
+async function processHookInput(data, deadline) {
   const { tool_name, tool_input, cwd } = data;
   
   // Extract file path based on tool type
@@ -68,7 +80,7 @@ async function processHookInput(data) {
     : resolve(cwd || process.cwd(), filePath);
   
   // Check if file is protected by ailock
-  const isProtected = await checkAilockProtection(absolutePath);
+  const isProtected = await checkAilockProtection(absolutePath, deadline);
   
   if (isProtected) {
     // Block the operation
@@ -111,7 +123,7 @@ function extractFilePath(toolName, toolInput) {
 /**
  * Check if a file is protected by ailock
  */
-async function checkAilockProtection(filePath) {
+async function checkAilockProtection(filePath, deadline) {
   // First, verify the file exists. Creation of a new file is outside the
   // chmod-based lock contract and remains allowed.
   if (!existsSync(filePath)) {
@@ -159,31 +171,35 @@ async function checkAilockProtection(filePath) {
   }
 
   const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  // 4s. This budget used to be 15s because the CLI globbed every protected
-  // pattern across the whole project; `--file` removed that walk, so the cost is
-  // now Node startup + one stat and does not grow with repo size. Measured
-  // 2026-09-21: 0.44s median in a 48,608-file repo, 0.47s after adding 20,000
-  // more files, 0.49s in a 148-file repo — the spread is startup noise. The old
-  // 15s (and the host-side 20s that matched it) was treating the symptom: it
-  // kept the ETIMEDOUT from firing without making the call cheaper.
-  //
-  // Keep this BELOW the host-side hook timeout in settings.json. Both matter for
-  // the same reason: a killed CLI throws ETIMEDOUT, the hook exits 2, and an edit
-  // that would have been allowed gets blocked.
-  const result = execFileSync(command, commandArgs, {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 4000,
-    cwd: projectDir,
-    env: {
-      ...process.env,
-      CI: 'true',
-      NON_INTERACTIVE: '1'
-    }
+  const remaining = Math.ceil(deadline - performance.now());
+  if (remaining <= 0) throw new Error('protection check deadline exceeded');
+  // An asynchronous child leaves the entry timer runnable while checking status.
+  const result = await new Promise((resolveResult, reject) => {
+    activeChild = execFile(command, commandArgs, {
+      encoding: 'utf8', timeout: remaining, killSignal: 'SIGKILL',
+      cwd: projectDir,
+      env: { ...process.env, CI: 'true', NON_INTERACTIVE: '1' },
+    }, (error, stdout) => {
+      activeChild = undefined;
+      if (error) {
+        // execFile errors can include private child output; expose only status.
+        reject(new Error(error.killed || performance.now() >= deadline
+          ? 'protection check deadline exceeded'
+          : `ailock status command failed (${error.code ?? error.signal ?? 'unknown'})`));
+      } else {
+        resolveResult(stdout);
+      }
+    });
+    activeChild.stdin.end();
   });
 
-  const report = JSON.parse(result);
-  if (!Array.isArray(report.files)) {
+  let report;
+  try {
+    report = JSON.parse(result);
+  } catch {
+    throw new Error('ailock list returned invalid status JSON');
+  }
+  if (!report || !Array.isArray(report.files)) {
     throw new Error('ailock list returned no files array');
   }
 
@@ -196,6 +212,5 @@ async function checkAilockProtection(filePath) {
 
 // Run the hook
 main().catch(error => {
-  console.error(`AILock Hook Fatal Error: ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(2);
+  failClosed(error instanceof Error ? error.message : 'protection check failed');
 });

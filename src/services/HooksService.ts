@@ -46,6 +46,35 @@ interface HookConfig {
   };
 }
 
+function isObject(value: unknown): value is Record<string, any> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateHookSettings(settings: unknown): asserts settings is Record<string, any> {
+  if (!isObject(settings) || (settings.hooks !== undefined && !isObject(settings.hooks))) {
+    throw new Error('Unknown settings object shape; hook installation refused');
+  }
+  const groups = settings.hooks?.PreToolUse;
+  if (groups === undefined) return;
+  if (!Array.isArray(groups) || groups.some(group =>
+    !isObject(group) || !Array.isArray(group.hooks) || group.hooks.some((handler: unknown) =>
+      !isObject(handler) || typeof handler.type !== 'string' ||
+      (handler.type === 'command' && (typeof handler.command !== 'string' || !handler.command))))) {
+    throw new Error('Unknown PreToolUse hook shape; hook installation refused');
+  }
+}
+
+function parseHookSettings(content: string): Record<string, any> {
+  let settings: unknown;
+  try {
+    settings = JSON.parse(content);
+  } catch {
+    throw new Error('Settings file is not valid JSON; hook change refused');
+  }
+  validateHookSettings(settings);
+  return settings;
+}
+
 /**
  * Claude Code executes hook commands through the platform shell. Keep the
  * executable and script path as separate, quoted arguments so package install
@@ -75,7 +104,7 @@ export function createShellCommand(
  */
 export class HooksService {
   private readonly SUPPORTED_TOOLS = ['claude'] as const;
-  private readonly HOOK_TIMEOUT = 5000;
+  private readonly HOOK_TIMEOUT_SECONDS = 5;
   private readonly commandExecutor: SecureCommandExecutor;
   
   constructor() {
@@ -177,7 +206,7 @@ export class HooksService {
               {
                 type: "command",
                 command: createShellCommand(process.execPath, [hookScriptPath]),
-                timeout: this.HOOK_TIMEOUT
+                timeout: this.HOOK_TIMEOUT_SECONDS
               }
             ]
           }
@@ -227,15 +256,10 @@ export class HooksService {
    * DRY - extracted from install logic for reuse
    */
   private async mergeSettings(settingsPath: string, hookConfig: HookConfig): Promise<HookConfig> {
-    let existingSettings = {};
+    let existingSettings: Record<string, any> = {};
     
     if (existsSync(settingsPath)) {
-      try {
-        const content = await readFile(settingsPath, 'utf-8');
-        existingSettings = JSON.parse(content);
-      } catch {
-        // Invalid JSON, will overwrite
-      }
+      existingSettings = parseHookSettings(await readFile(settingsPath, 'utf-8'));
     } else {
       // Create directory if needed
       const settingsDir = path.dirname(settingsPath);
@@ -244,35 +268,30 @@ export class HooksService {
       }
     }
     
-    // Merge settings (deep merge for hooks)
-    const mergedSettings = {
+    validateHookSettings(existingSettings);
+    const hooks = existingSettings.hooks ?? {};
+    const groups = hooks.PreToolUse ?? [];
+    const owned = hookConfig.hooks.PreToolUse[0].hooks[0];
+    let found = false;
+    // Update only this installation's exact command. Retain mixed groups,
+    // custom matchers/metadata and unrelated duplicate commands as authored.
+    const updated = groups.map((group: PreToolUseHook) => ({
+      ...group,
+      hooks: group.hooks.map(handler => {
+        if (handler.type !== 'command' || handler.command !== owned.command) return handler;
+        found = true;
+        return { ...handler, timeout: owned.timeout };
+      }),
+    }));
+    if (!found) updated.push(...hookConfig.hooks.PreToolUse);
+    return {
       ...existingSettings,
       hooks: {
-        ...(existingSettings as HookConfig).hooks,
-        PreToolUse: [
-          ...((existingSettings as HookConfig).hooks?.PreToolUse || []).filter((item) => {
-            const command = item.hooks?.[0]?.command;
-            return !command || !command.includes('claude-ailock-hook');
-          }),
-          ...hookConfig.hooks.PreToolUse
-        ]
+        ...hooks,
+        PreToolUse: updated,
       }
     };
     
-    // Remove duplicates based on command path
-    if (mergedSettings.hooks.PreToolUse.length > 1) {
-      const seen = new Set();
-      mergedSettings.hooks.PreToolUse = mergedSettings.hooks.PreToolUse.filter((item) => {
-        const key = item.hooks?.[0]?.command;
-        if (key && seen.has(key)) {
-          return false;
-        }
-        seen.add(key);
-        return true;
-      });
-    }
-    
-    return mergedSettings;
   }
 
   /**
@@ -289,22 +308,20 @@ export class HooksService {
     
     try {
       const content = await readFile(settingsPath, 'utf-8');
-      const settings = JSON.parse(content);
+      const settings = parseHookSettings(content);
       
       if (settings.hooks?.PreToolUse) {
-        // Filter out ailock hooks
-        settings.hooks.PreToolUse = settings.hooks.PreToolUse.filter((item: PreToolUseHook) => {
-          const command = item.hooks?.[0]?.command;
-          return !command || !command.includes('claude-ailock-hook');
-        });
-        
-        // Remove empty hooks object if no hooks left
-        if (settings.hooks.PreToolUse.length === 0) {
-          delete settings.hooks.PreToolUse;
-        }
-        if (Object.keys(settings.hooks).length === 0) {
-          delete settings.hooks;
-        }
+        const command = this.createHookConfig(this.getHookScriptPath()).hooks.PreToolUse[0].hooks[0].command;
+        let removed = false;
+        settings.hooks.PreToolUse = settings.hooks.PreToolUse.map((group: PreToolUseHook) => ({
+          ...group,
+          hooks: group.hooks.filter(handler => {
+            if (handler.type !== 'command' || handler.command !== command) return true;
+            removed = true;
+            return false;
+          }),
+        }));
+        if (!removed) return;
         
         // Write updated settings
         await writeFile(settingsPath, JSON.stringify(settings, null, 2));
@@ -347,15 +364,14 @@ export class HooksService {
       
       try {
         const content = await readFile(settingsPath, 'utf-8');
-        const settings = JSON.parse(content);
+        const settings = parseHookSettings(content);
         
-        const ailockHooks = settings.hooks?.PreToolUse?.filter((item: PreToolUseHook) => {
-          const command = item.hooks?.[0]?.command;
-          return command && command.includes('claude-ailock-hook');
-        });
+        const command = this.createHookConfig(this.getHookScriptPath()).hooks.PreToolUse[0].hooks[0].command;
+        const ailockHooks = settings.hooks?.PreToolUse?.flatMap((group: PreToolUseHook) =>
+          group.hooks.filter(handler => handler.type === 'command' && handler.command === command));
         
         return {
-          installed: ailockHooks && ailockHooks.length > 0,
+          installed: Boolean(ailockHooks?.length),
           location: settingsPath,
           hookCount: ailockHooks ? ailockHooks.length : 0
         };
